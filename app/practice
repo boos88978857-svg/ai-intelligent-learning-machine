@@ -1,0 +1,12 @@
+export default function PracticePage() {
+  return (
+    <main style={{ padding: 24 }}>
+      <h1>练习区</h1>
+      <p>这里以后放练习题、按钮、记录等。</p>
+
+      <a href="/" style={{ display: "inline-block", marginTop: 16 }}>
+        ← 回首页
+      </a>
+    </main>
+  );
+}
