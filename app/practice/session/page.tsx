@@ -13,9 +13,25 @@ function formatTime(sec: number) {
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
+type AnswerState =
+  | { kind: "none" }
+  | { kind: "choice"; selectedId: string }
+  | { kind: "fill"; text: string }
+  | { kind: "application"; text: string };
+
 export default function PracticeSessionPage() {
   const router = useRouter();
   const [session, setSession] = useState<PracticeSession | null>(null);
+
+  // ✅ 作答狀態（本頁暫存，之後可寫進 session）
+  const [answer, setAnswer] = useState<AnswerState>({ kind: "none" });
+
+  // ✅ 顯示提示
+  const [showHint, setShowHint] = useState(false);
+
+  // ✅ 對/錯統計（先做在本頁，之後再寫進 session）
+  const [correctCount, setCorrectCount] = useState(0);
+  const [wrongCount, setWrongCount] = useState(0);
 
   // 載入續做資料
   useEffect(() => {
@@ -27,7 +43,7 @@ export default function PracticeSessionPage() {
     setSession(s);
   }, [router]);
 
-  // 簡單計時（每秒 +1）
+  // 計時（每秒 +1）
   useEffect(() => {
     if (!session || session.paused) return;
 
@@ -48,6 +64,12 @@ export default function PracticeSessionPage() {
     return getMockQuestion(session.subject);
   }, [session]);
 
+  // ✅ 每題切換：重置作答狀態/提示
+  useEffect(() => {
+    setAnswer({ kind: "none" });
+    setShowHint(false);
+  }, [question?.id]);
+
   if (!session) return null;
 
   function togglePause() {
@@ -60,6 +82,46 @@ export default function PracticeSessionPage() {
     router.back();
   }
 
+  function nextQuestion() {
+    // ✅ 先做 demo：只是把題號 +1（未來會真的換題）
+    const next = { ...session, currentIndex: session.currentIndex + 1, paused: false };
+    saveSession(next);
+    setSession(next);
+  }
+
+  function endAndBackToHub() {
+    // ✅ 結束回學習區（你要保留進度就不 clear，現在先保留）
+    router.replace("/practice");
+  }
+
+  function canSubmit(q: Question, a: AnswerState) {
+    if (q.type === "choice") return a.kind === "choice";
+    if (q.type === "fill") return a.kind === "fill" && a.text.trim().length > 0;
+    return a.kind === "application" && a.text.trim().length > 0;
+  }
+
+  function submit(q: Question) {
+    if (!canSubmit(q, answer)) return;
+
+    // ✅ 先做 demo 判題（之後會改成題庫評分）
+    let isCorrect = false;
+
+    if (q.type === "choice" && answer.kind === "choice") {
+      isCorrect = answer.selectedId === q.answerId;
+    } else if (q.type === "fill" && answer.kind === "fill") {
+      isCorrect = answer.text.trim() === q.answerText.trim();
+    } else if (q.type === "application" && answer.kind === "application") {
+      // 應用題先不嚴格判斷：只要有填就算已提交（先走流程）
+      isCorrect = true;
+    }
+
+    if (isCorrect) setCorrectCount((c) => c + 1);
+    else setWrongCount((w) => w + 1);
+
+    // ✅ 提交後自動下一題（你之後可以改成「顯示解析→下一題」）
+    nextQuestion();
+  }
+
   return (
     <main style={ui.wrap}>
       <h1 style={{ margin: "0 0 12px", fontSize: 34, fontWeight: 900 }}>
@@ -69,6 +131,7 @@ export default function PracticeSessionPage() {
       {/* A. 狀態區（固定） */}
       <section style={ui.card}>
         <h2 style={ui.cardTitle}>狀態</h2>
+
         <p style={ui.cardDesc}>
           科目：{session.subject}
           <br />
@@ -78,6 +141,12 @@ export default function PracticeSessionPage() {
           <br />
           狀態：{session.paused ? "已暫停" : "進行中"}
         </p>
+
+        {/* ✅ 對/錯統計建議放在「狀態卡」底部，一眼看得到 */}
+        <div style={{ marginTop: 10, display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <span style={{ ...ui.navBtn, opacity: 0.9 }}>對：{correctCount}</span>
+          <span style={{ ...ui.navBtn, opacity: 0.9 }}>錯：{wrongCount}</span>
+        </div>
 
         <div style={{ marginTop: 14, display: "flex", gap: 12, flexWrap: "wrap" }}>
           <button onClick={togglePause} style={{ ...ui.navBtn, cursor: "pointer" }}>
@@ -97,58 +166,169 @@ export default function PracticeSessionPage() {
         {!question ? (
           <p style={ui.cardDesc}>題目載入中…</p>
         ) : (
-          <QuestionPreview question={question} />
+          <>
+            <p style={{ ...ui.cardDesc, marginTop: 10 }}>
+              {question.prompt}
+              <br />
+              <span style={{ opacity: 0.7 }}>
+                工具：
+                {question.tools?.whiteboard ? " 白板開" : " 白板關"} /
+                {question.tools?.abacus ? " 算盤開" : " 算盤關"}
+              </span>
+            </p>
+
+            {/* ✅ 提示：放在題目區「題幹下方」，不占狀態卡空間 */}
+            <div style={{ marginTop: 10, display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <button
+                onClick={() => setShowHint((v) => !v)}
+                style={{ ...ui.navBtn, cursor: "pointer" }}
+              >
+                {showHint ? "隱藏提示" : "顯示提示"}
+              </button>
+            </div>
+
+            {showHint && question.hint ? (
+              <div style={{ marginTop: 10, ...ui.navBtn, opacity: 0.9 }}>
+                提示：{question.hint}
+              </div>
+            ) : null}
+
+            {/* ✅ 作答區：依題型渲染 */}
+            <div style={{ marginTop: 14 }}>
+              <AnswerArea question={question} answer={answer} setAnswer={setAnswer} paused={!!session.paused} />
+            </div>
+
+            {/* ✅ 操作列：建議放在作答區下方（拇指區） */}
+            <div style={{ marginTop: 14, display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <button
+                onClick={() => submit(question)}
+                disabled={!canSubmit(question, answer) || !!session.paused}
+                style={{
+                  ...ui.navBtn,
+                  cursor: !canSubmit(question, answer) || !!session.paused ? "not-allowed" : "pointer",
+                  opacity: !canSubmit(question, answer) || !!session.paused ? 0.5 : 1,
+                }}
+              >
+                提交答案
+              </button>
+
+              <button
+                onClick={nextQuestion}
+                disabled={!!session.paused}
+                style={{
+                  ...ui.navBtn,
+                  cursor: !!session.paused ? "not-allowed" : "pointer",
+                  opacity: !!session.paused ? 0.5 : 1,
+                }}
+              >
+                下一題 →
+              </button>
+
+              <button
+                onClick={endAndBackToHub}
+                style={{ ...ui.navBtn, cursor: "pointer" }}
+              >
+                結束並回學習區
+              </button>
+            </div>
+          </>
         )}
       </section>
     </main>
   );
 }
 
-/** 先做「題目渲染骨架」：目前只預覽，不做判題 */
-function QuestionPreview(props: { question: Question }) {
-  const q = props.question;
+function AnswerArea(props: {
+  question: Question;
+  answer: AnswerState;
+  setAnswer: (a: AnswerState) => void;
+  paused: boolean;
+}) {
+  const { question: q, answer, setAnswer, paused } = props;
+
+  // ✅ 共用：暫停時不可操作
+  const disabledStyle = paused ? { opacity: 0.6, pointerEvents: "none" as const } : undefined;
+
+  if (q.type === "choice") {
+    const selectedId = answer.kind === "choice" ? answer.selectedId : "";
+
+    return (
+      <div style={{ display: "grid", gap: 10, ...(disabledStyle || {}) }}>
+        {q.options.map((op) => {
+          const selected = selectedId === op.id;
+          return (
+            <button
+              key={op.id}
+              onClick={() => setAnswer({ kind: "choice", selectedId: op.id })}
+              style={{
+                ...ui.navBtn,
+                cursor: "pointer",
+                textAlign: "left",
+                fontWeight: selected ? 900 : 600,
+                borderColor: selected ? "rgba(29,78,216,0.6)" : "rgba(0,0,0,0.15)",
+              }}
+            >
+              {op.text}
+              {selected ? " ✓" : ""}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (q.type === "fill") {
+    const text = answer.kind === "fill" ? answer.text : "";
+
+    return (
+      <div style={{ ...(disabledStyle || {}) }}>
+        <div style={{ ...ui.navBtn, padding: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>請輸入答案</div>
+          <input
+            value={text}
+            onChange={(e) => setAnswer({ kind: "fill", text: e.target.value })}
+            placeholder="在這裡輸入…"
+            style={{
+              width: "100%",
+              padding: 12,
+              borderRadius: 12,
+              border: "1px solid rgba(0,0,0,0.15)",
+              fontSize: 16,
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // application
+  const text = answer.kind === "application" ? answer.text : "";
 
   return (
-    <div>
-      <p style={{ ...ui.cardDesc, marginTop: 10 }}>
-        {q.prompt}
-        {q.hint ? (
-          <>
-            <br />
-            <span style={{ opacity: 0.7 }}>提示：{q.hint}</span>
-          </>
-        ) : null}
-        <br />
-        <span style={{ opacity: 0.7 }}>
-          工具：
-          {q.tools?.whiteboard ? " 白板開" : " 白板關"} /
-          {q.tools?.abacus ? " 算盤開" : " 算盤關"}
-        </span>
-      </p>
-
-      {/* 題型預覽（下一步才換成真正作答元件） */}
-      <div style={{ marginTop: 12 }}>
-        {q.type === "choice" ? (
-          <div style={{ display: "grid", gap: 10 }}>
-            {q.options.map((op) => (
-              <div key={op.id} style={{ ...ui.navBtn, opacity: 0.9 }}>
-                {op.text}
-              </div>
-            ))}
-          </div>
-        ) : q.type === "fill" ? (
-          <div style={{ ...ui.navBtn, opacity: 0.9 }}>
-            （填空題示意）這裡之後放輸入框
-          </div>
-        ) : (
-          <div style={{ ...ui.navBtn, opacity: 0.9 }}>
-            （應用題示意）這裡之後放作答區 + 可能的白板/算盤
-          </div>
-        )}
+    <div style={{ ...(disabledStyle || {}) }}>
+      <div style={{ ...ui.navBtn, padding: 12 }}>
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>請寫下你的解題過程/答案</div>
+        <textarea
+          value={text}
+          onChange={(e) => setAnswer({ kind: "application", text: e.target.value })}
+          placeholder="例如：12 ÷ 3 = 4…"
+          rows={4}
+          style={{
+            width: "100%",
+            padding: 12,
+            borderRadius: 12,
+            border: "1px solid rgba(0,0,0,0.15)",
+            fontSize: 16,
+            lineHeight: 1.6,
+            resize: "vertical",
+          }}
+        />
       </div>
 
-      <div style={{ marginTop: 14, opacity: 0.6 }}>
-        ※ 下一步才加入：提示按鈕、對/錯統計、提交答案、下一題、結束等操作列
+      {/* 先預留：白板/算盤入口（下一步才真的做） */}
+      <div style={{ marginTop: 10, display: "flex", gap: 12, flexWrap: "wrap", opacity: 0.85 }}>
+        {q.tools?.whiteboard ? <span style={ui.navBtn}>白板（下一步接）</span> : null}
+        {q.tools?.abacus ? <span style={ui.navBtn}>算盤（下一步接）</span> : null}
       </div>
     </div>
   );
