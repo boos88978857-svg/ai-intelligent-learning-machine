@@ -1,38 +1,47 @@
+// app/ui.tsx
+import type { CSSProperties } from "react";
+
 export const ui = {
   wrap: {
     padding: 24,
-    maxWidth: 980,
+    maxWidth: 960,
     margin: "0 auto",
-  } as React.CSSProperties,
+  } as CSSProperties,
 
-  navBar: {
+  // 你 layout 可能會用到
+  page: {
+    minHeight: "100vh",
+    background: "#fff",
+  } as CSSProperties,
+
+  navWrap: {
+    padding: "18px 18px 14px",
+    borderBottom: "1px solid rgba(0,0,0,0.08)",
+  } as CSSProperties,
+
+  nav: {
     display: "flex",
     gap: 10,
     flexWrap: "wrap",
-    padding: "14px 24px",
-    borderBottom: "1px solid rgba(0,0,0,0.08)",
-    background: "#fff",
-    position: "sticky",
-    top: 0,
-    zIndex: 50,
-  } as React.CSSProperties,
+  } as CSSProperties,
 
   navBtn: {
     display: "inline-block",
-    padding: "10px 14px",
+    padding: "10px 16px",
     border: "1px solid rgba(0,0,0,0.15)",
-    borderRadius: 12,
+    borderRadius: 14,
     textDecoration: "none",
-    color: "#111",
-    background: "#fff",
-    fontWeight: 600,
-  } as React.CSSProperties,
+    color: "inherit",
+    background: "white",
+    fontWeight: 700,
+  } as CSSProperties,
 
+  // 卡片/網格
   grid2: {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: 14,
-  } as React.CSSProperties,
+  } as CSSProperties,
 
   card: {
     display: "block",
@@ -41,30 +50,36 @@ export const ui = {
     borderRadius: 14,
     textDecoration: "none",
     color: "inherit",
-    background: "#fff",
-  } as React.CSSProperties,
+    background: "white",
+  } as CSSProperties,
 
   cardTitle: {
     margin: 0,
     fontSize: 22,
     fontWeight: 900,
-  } as React.CSSProperties,
+  } as CSSProperties,
 
   cardDesc: {
     margin: "10px 0 0",
     opacity: 0.75,
-    lineHeight: 1.7,
-  } as React.CSSProperties,
+    lineHeight: 1.6,
+  } as CSSProperties,
 
-  backLink: {
+  // ✅ 你缺的就是這個
+  smallLink: {
     display: "inline-block",
     marginTop: 14,
     color: "#1d4ed8",
-    background: "none",
-    border: "none",
-    padding: 0,
-    fontSize: 16,
-    cursor: "pointer",
     textDecoration: "underline",
-  } as React.CSSProperties,
+    fontWeight: 800,
+  } as CSSProperties,
+
+  // 小膠囊（狀態用）
+  pill: {
+    padding: "10px 14px",
+    border: "1px solid rgba(0,0,0,0.15)",
+    borderRadius: 14,
+    background: "#fff",
+    fontWeight: 800,
+  } as CSSProperties,
 };
