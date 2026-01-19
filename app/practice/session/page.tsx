@@ -28,6 +28,7 @@ export default function PracticeSessionPage() {
 
   // ✅ 顯示提示
   const [showHint, setShowHint] = useState(false);
+const [hintCount, setHintCount] = useState(0); // 提示已使用次數（最多 3）
 
   // ✅ 對/錯統計（先做在本頁，之後再寫進 session）
   const [correctCount, setCorrectCount] = useState(0);
@@ -65,10 +66,11 @@ export default function PracticeSessionPage() {
   }, [session]);
 
   // ✅ 每題切換：重置作答狀態/提示
-  useEffect(() => {
-    setAnswer({ kind: "none" });
-    setShowHint(false);
-  }, [question?.id]);
+useEffect(() => {
+  setAnswer({ kind: "none" });
+  setShowHint(false);
+  setHintCount(0); // ✅ 換題提示次數歸零
+}, [question?.id]);
 
   if (!session) return null;
 
@@ -178,13 +180,21 @@ export default function PracticeSessionPage() {
             </p>
 
             {/* ✅ 提示：放在題目區「題幹下方」，不占狀態卡空間 */}
-            <div style={{ marginTop: 10, display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <button
-                onClick={() => setShowHint((v) => !v)}
-                style={{ ...ui.navBtn, cursor: "pointer" }}
-              >
-                {showHint ? "隱藏提示" : "顯示提示"}
-              </button>
+            <div style={{ marginTop: 10, display: "flex", gap: 12, flexWrap: "<button
+  onClick={() => {
+    if (hintCount >= 3) return;
+    setShowHint(true);
+    setHintCount((c) => c + 1);
+  }}
+  disabled={hintCount >= 3}
+  style={{
+    ...ui.navBtn,
+    cursor: hintCount >= 3 ? "not-allowed" : "pointer",
+    opacity: hintCount >= 3 ? 0.5 : 1,
+  }}
+>
+  提示（3/{hintCount})
+</button>
             </div>
 
             {showHint && question.hint ? (
