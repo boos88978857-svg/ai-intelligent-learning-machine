@@ -1,77 +1,87 @@
 // app/ui.tsx
-import type { CSSProperties } from "react";
+import { CSSProperties } from "react";
 
 export const ui = {
-  wrap: {
-    padding: 24,
-    maxWidth: 960,
-    margin: "0 auto",
-  } as CSSProperties,
-
-  // 你 layout 可能會用到
+  /* ===== 全站容器 ===== */
   page: {
     minHeight: "100vh",
-    background: "#fff",
+    background: "#fafafa",
   } as CSSProperties,
 
-  navWrap: {
-    padding: "18px 18px 14px",
-    borderBottom: "1px solid rgba(0,0,0,0.08)",
+  wrap: {
+    maxWidth: 960,
+    margin: "0 auto",
+    padding: "16px 16px 40px",
   } as CSSProperties,
 
-  nav: {
+  /* ===== 导航列 ===== */
+  navBar: {
     display: "flex",
-    gap: 10,
+    gap: 12,
     flexWrap: "wrap",
+    marginBottom: 20,
   } as CSSProperties,
 
   navBtn: {
-    display: "inline-block",
-    padding: "10px 16px",
-    border: "1px solid rgba(0,0,0,0.15)",
+    padding: "8px 14px",
     borderRadius: 14,
-    textDecoration: "none",
-    color: "inherit",
-    background: "white",
+    border: "1.5px solid #ddd",
+    background: "#fff",
     fontWeight: 700,
+    cursor: "pointer",
   } as CSSProperties,
 
-  // 卡片/網格
-  grid2: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: 14,
+  navBtnActive: {
+    background: "#111",
+    color: "#fff",
+    borderColor: "#111",
   } as CSSProperties,
 
+  /* ===== 卡片 ===== */
   card: {
-    display: "block",
-    padding: 18,
-    border: "1px solid rgba(0,0,0,0.15)",
-    borderRadius: 14,
-    textDecoration: "none",
-    color: "inherit",
-    background: "white",
+    background: "#fff",
+    borderRadius: 18,
+    padding: 16,
+    border: "1.5px solid #e5e5e5",
+    marginBottom: 20,
   } as CSSProperties,
 
   cardTitle: {
-    margin: 0,
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: 900,
+    marginBottom: 6,
   } as CSSProperties,
 
   cardDesc: {
-    margin: "10px 0 0",
-    opacity: 0.75,
+    fontSize: 14,
     lineHeight: 1.6,
+    opacity: 0.75,
   } as CSSProperties,
 
-  // ✅ 你缺的就是這個
+  /* ===== 小标签 / 统计 ===== */
+  pillRow: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginBottom: 12,
+  } as CSSProperties,
+
+  pill: {
+    padding: "6px 12px",
+    borderRadius: 999,
+    border: "1.5px solid #ddd",
+    background: "#fff",
+    fontSize: 13,
+    fontWeight: 800,
+  } as CSSProperties,
+
+  /* ===== 链接 / 返回 ===== */
   smallLink: {
-    display: "inline-block",
-    marginTop: 14,
+    fontSize: 14,
+    fontWeight: 800,
     color: "#1d4ed8",
     textDecoration: "underline",
-    fontWeight: 800,
+    cursor: "pointer",
   } as CSSProperties,
 
   backLink: {
@@ -86,12 +96,88 @@ export const ui = {
     cursor: "pointer",
   } as CSSProperties,
 
-  // 小膠囊（狀態用）
-  pill: {
-    padding: "10px 14px",
-    border: "1px solid rgba(0,0,0,0.15)",
+  /* ===== 作答区 ===== */
+  optionGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 12,
+    marginTop: 12,
+  } as CSSProperties,
+
+  option: {
+    padding: "14px 12px",
+    borderRadius: 16,
+    border: "2px solid #ddd",
+    fontWeight: 900,
+    background: "#fff",
+    cursor: "pointer",
+    textAlign: "center",
+  } as CSSProperties,
+
+  optionSelected: {
+    borderColor: "#2563eb",
+    background: "#eff6ff",
+  } as CSSProperties,
+
+  optionCorrect: {
+    borderColor: "#16a34a",
+    background: "#ecfdf5",
+  } as CSSProperties,
+
+  optionWrong: {
+    borderColor: "#dc2626",
+    background: "#fef2f2",
+  } as CSSProperties,
+
+  /* ===== 操作列 ===== */
+  actionRow: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    marginTop: 14,
+  } as CSSProperties,
+
+  primaryBtn: {
+    padding: "10px 16px",
     borderRadius: 14,
+    border: "none",
+    background: "#16a34a",
+    color: "#fff",
+    fontWeight: 900,
+    cursor: "pointer",
+  } as CSSProperties,
+
+  ghostBtn: {
+    padding: "10px 16px",
+    borderRadius: 14,
+    border: "1.5px solid #ddd",
     background: "#fff",
     fontWeight: 800,
+    cursor: "pointer",
+  } as CSSProperties,
+
+  disabledBtn: {
+    opacity: 0.4,
+    pointerEvents: "none",
+  } as CSSProperties,
+
+  /* ===== 提示 / 讯息 ===== */
+  messageCard: {
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 14,
+    background: "#f9fafb",
+    border: "1.5px solid #e5e7eb",
+    fontWeight: 700,
+    lineHeight: 1.6,
+  } as CSSProperties,
+
+  pauseCard: {
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 16,
+    background: "#fff7ed",
+    border: "2px solid #fb923c",
+    fontWeight: 900,
   } as CSSProperties,
 };
