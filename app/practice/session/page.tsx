@@ -1,39 +1,11 @@
 // app/practice/session/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ui } from "../../ui";
 import { loadSession, saveSession, PracticeSession } from "../../lib/session";
-
-/** ===== Step 2-1：題目資料結構（先固定格式） ===== */
-type QuestionType = "choice" | "application";
-
-type Question = {
-  id: string;
-  subject: string;
-  type: QuestionType;
-  prompt: string;
-  options?: string[]; // choice 題才需要
-  hint?: string;
-  tools?: {
-    whiteboard?: boolean;
-    abacus?: boolean;
-  };
-};
-
-// 假題目（示範用，之後會由題庫系統取代）
-const mockQuestion: Question = {
-  id: "demo-1",
-  subject: "數學",
-  type: "application",
-  prompt: "小明有 12 顆糖，平均分給 3 個朋友，每人可以分到幾顆？",
-  hint: "想想除法",
-  tools: {
-    whiteboard: true,
-    abacus: true,
-  },
-};
+import { getMockQuestion, Question } from "../../lib/question";
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60);
@@ -71,6 +43,11 @@ export default function PracticeSessionPage() {
     return () => clearInterval(timer);
   }, [session]);
 
+  const question: Question | null = useMemo(() => {
+    if (!session) return null;
+    return getMockQuestion(session.subject);
+  }, [session]);
+
   if (!session) return null;
 
   function togglePause() {
@@ -85,12 +62,12 @@ export default function PracticeSessionPage() {
 
   return (
     <main style={ui.wrap}>
-      <h1 style={{ margin: "0 0 12px", fontSize: 28, fontWeight: 900 }}>
+      <h1 style={{ margin: "0 0 12px", fontSize: 34, fontWeight: 900 }}>
         作答中（{session.subject}）
       </h1>
 
-      {/* 狀態卡 */}
-      <div style={ui.card}>
+      {/* A. 狀態區（固定） */}
+      <section style={ui.card}>
         <h2 style={ui.cardTitle}>狀態</h2>
         <p style={ui.cardDesc}>
           科目：{session.subject}
@@ -111,18 +88,68 @@ export default function PracticeSessionPage() {
             ← 回上一頁
           </button>
         </div>
+      </section>
+
+      {/* B. 題目區（依題型變化） */}
+      <section style={{ ...ui.card, marginTop: 16 }}>
+        <h2 style={ui.cardTitle}>題目</h2>
+
+        {!question ? (
+          <p style={ui.cardDesc}>題目載入中…</p>
+        ) : (
+          <QuestionPreview question={question} />
+        )}
+      </section>
+    </main>
+  );
+}
+
+/** 先做「題目渲染骨架」：目前只預覽，不做判題 */
+function QuestionPreview(props: { question: Question }) {
+  const q = props.question;
+
+  return (
+    <div>
+      <p style={{ ...ui.cardDesc, marginTop: 10 }}>
+        {q.prompt}
+        {q.hint ? (
+          <>
+            <br />
+            <span style={{ opacity: 0.7 }}>提示：{q.hint}</span>
+          </>
+        ) : null}
+        <br />
+        <span style={{ opacity: 0.7 }}>
+          工具：
+          {q.tools?.whiteboard ? " 白板開" : " 白板關"} /
+          {q.tools?.abacus ? " 算盤開" : " 算盤關"}
+        </span>
+      </p>
+
+      {/* 題型預覽（下一步才換成真正作答元件） */}
+      <div style={{ marginTop: 12 }}>
+        {q.type === "choice" ? (
+          <div style={{ display: "grid", gap: 10 }}>
+            {q.options.map((op) => (
+              <div key={op.id} style={{ ...ui.navBtn, opacity: 0.9 }}>
+                {op.text}
+              </div>
+            ))}
+          </div>
+        ) : q.type === "fill" ? (
+          <div style={{ ...ui.navBtn, opacity: 0.9 }}>
+            （填空題示意）這裡之後放輸入框
+          </div>
+        ) : (
+          <div style={{ ...ui.navBtn, opacity: 0.9 }}>
+            （應用題示意）這裡之後放作答區 + 可能的白板/算盤
+          </div>
+        )}
       </div>
 
-      {/* Step 2-1 先只確認「題目資料」有被帶進來 */}
-      <div style={{ marginTop: 16, opacity: 0.75 }}>
-        <div>（除錯用）假題目已載入：{mockQuestion.id}</div>
-        <div>題幹：{mockQuestion.prompt}</div>
-        <div>提示：{mockQuestion.hint ?? "無"}</div>
-        <div>
-          工具：白板 {mockQuestion.tools?.whiteboard ? "開" : "關"} / 算盤{" "}
-          {mockQuestion.tools?.abacus ? "開" : "關"}
-        </div>
+      <div style={{ marginTop: 14, opacity: 0.6 }}>
+        ※ 下一步才加入：提示按鈕、對/錯統計、提交答案、下一題、結束等操作列
       </div>
-    </main>
+    </div>
   );
 }
