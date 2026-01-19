@@ -1,10 +1,8 @@
-// app/practice/page.tsx
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ui } from "../ui";
-import BackButton from "../components/BackButton";
 import {
   clearSession,
   loadSession,
@@ -20,6 +18,7 @@ function formatTime(sec: number) {
 }
 
 export default function PracticeHubPage() {
+  const router = useRouter();
   const [session, setSession] = useState<PracticeSession | null>(null);
 
   useEffect(() => {
@@ -30,11 +29,11 @@ export default function PracticeHubPage() {
     const s = newSession(subject);
     saveSession(s);
     setSession(s);
-    window.location.href = "/practice/session";
+    router.push("/practice/session");
   }
 
   function resume() {
-    window.location.href = "/practice/session";
+    router.push("/practice/session");
   }
 
   function reset() {
@@ -47,15 +46,14 @@ export default function PracticeHubPage() {
       <h1 style={{ margin: "0 0 12px", fontSize: 34, fontWeight: 900 }}>
         學習區
       </h1>
-
       <p style={{ margin: "0 0 16px", opacity: 0.75, lineHeight: 1.7 }}>
         這裡是「續做中心」：手機沒電、斷網、閃退，都不會讓你做到一半的題目消失。
       </p>
 
-      {/* 有未完成進度 */}
       {session ? (
         <div style={ui.card}>
           <h2 style={ui.cardTitle}>未完成進度</h2>
+
           <p style={ui.cardDesc}>
             科目：{session.subject}
             <br />
@@ -74,10 +72,26 @@ export default function PracticeHubPage() {
               清除進度
             </button>
           </div>
+
+          <button
+            onClick={() => router.back()}
+            style={{
+              display: "inline-block",
+              marginTop: 14,
+              color: "#1d4ed8",
+              background: "none",
+              border: "none",
+              padding: 0,
+              fontSize: 16,
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+          >
+            ← 回上一頁
+          </button>
         </div>
       ) : (
         <>
-          {/* 沒有進度：提供開始入口 */}
           <div style={ui.grid2}>
             <button
               onClick={() => start("英文")}
@@ -97,18 +111,25 @@ export default function PracticeHubPage() {
               <span style={ui.smallLink}>開始 →</span>
             </button>
           </div>
+
+          <button
+            onClick={() => router.back()}
+            style={{
+              display: "inline-block",
+              marginTop: 14,
+              color: "#1d4ed8",
+              background: "none",
+              border: "none",
+              padding: 0,
+              fontSize: 16,
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+          >
+            ← 回上一頁
+          </button>
         </>
       )}
-
-      {/* ✅ 統一：只回上一頁（回首頁用上方導覽） */}
-      <div style={{ marginTop: 20 }}>
-        <BackButton />
-      </div>
-
-      {/* 保留一個隱性入口（可選），不影響你的規則 */}
-      <div style={{ marginTop: 10, opacity: 0.5, fontSize: 12 }}>
-        <Link href="/practice/session">（除錯用）直接進入做題畫面</Link>
-      </div>
     </main>
   );
 }
