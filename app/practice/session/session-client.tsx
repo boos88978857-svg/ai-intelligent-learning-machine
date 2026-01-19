@@ -11,7 +11,7 @@ type Question = {
   subject: PracticeSession["subject"];
   prompt: string;
   choices: { id: string; text: string; correct?: boolean }[];
-  hints: string[]; // 多段提示
+  hints: string[];
 };
 
 function formatTime(sec: number) {
@@ -20,7 +20,7 @@ function formatTime(sec: number) {
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-/** ✅ 測試題庫（示範用）：之後會換成你自建題庫系統 */
+/** 測試題庫（示範用） */
 const mockQuestions: Question[] = [
   {
     id: "en-1",
@@ -66,24 +66,15 @@ const HINT_LIMIT = 5;
 export default function PracticeSessionClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  // 若你未來要用 query 參數指定科目/回合，可以留著；目前不強制
   const subjectFromQuery = useMemo(() => searchParams.get("subject"), [searchParams]);
 
   const [session, setSession] = useState<PracticeSession | null>(null);
 
-  // 回合統計（先存在本頁；你要「跨頁續做精準還原」下一步我會寫回 session）
-  const [correctCount, setCorrectCount] = useState(0);
-  const [wrongCount, setWrongCount] = useState(0);
-  const [hintsUsed, setHintsUsed] = useState(0);
-
-  // 題目互動狀態
+  // 題目互動狀態（每題會重置）
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [hintText, setHintText] = useState<string | null>(null);
-
-  const [roundDone, setRoundDone] = useState(false);
 
   // 載入續做資料
   useEffect(() => {
@@ -93,24 +84,37 @@ export default function PracticeSessionClient() {
       return;
     }
 
-    // 可選：如果網址帶 subject，就覆蓋當前 subject（你未來可以用學習區做到「不同回合」）
-    if (subjectFromQuery && s.subject !== (subjectFromQuery as any)) {
-      const next = { ...s, subject: subjectFromQuery as any };
+    // ✅ 確保 session 內有我們需要的欄位（舊資料向下相容）
+    const patched: PracticeSession = {
+      ...s,
+      totalQuestions: (s as any).totalQuestions ?? TOTAL_PER_ROUND,
+      hintLimit: (s as any).hintLimit ?? HINT_LIMIT,
+      correctCount: (s as any).correctCount ?? 0,
+      wrongCount: (s as any).wrongCount ?? 0,
+      hintsUsed: (s as any).hintsUsed ?? 0,
+      roundDone: (s as any).roundDone ?? false,
+    } as any;
+
+    // 可選：subject 由 query 覆蓋（你之後做多回合時會用到）
+    if (subjectFromQuery && patched.subject !== (subjectFromQuery as any)) {
+      const next = { ...patched, subject: subjectFromQuery as any };
       saveSession(next);
       setSession(next);
       return;
     }
 
-    setSession(s);
+    // 寫回修補後版本
+    saveSession(patched);
+    setSession(patched);
   }, [router, subjectFromQuery]);
 
   // 計時（暫停就停；回合完成也停）
   useEffect(() => {
-    if (!session || session.paused || roundDone) return;
+    if (!session || session.paused || session.roundDone) return;
 
     const timer = setInterval(() => {
       setSession((prev) => {
-        if (!prev || prev.paused || roundDone) return prev;
+        if (!prev || prev.paused || prev.roundDone) return prev;
         const next = { ...prev, elapsedSec: prev.elapsedSec + 1 };
         saveSession(next);
         return next;
@@ -118,7 +122,7 @@ export default function PracticeSessionClient() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [session, roundDone]);
+  }, [session]);
 
   const currentQuestion = useMemo(() => {
     if (!session) return null;
@@ -131,19 +135,26 @@ export default function PracticeSessionClient() {
   if (!session || !currentQuestion) return null;
 
   const currentNo = session.currentIndex + 1;
-  const shownNo = Math.min(currentNo, TOTAL_PER_ROUND);
-  const hintsLeft = Math.max(0, HINT_LIMIT - hintsUsed);
+  const shownNo = Math.min(currentNo, session.totalQuestions ?? TOTAL_PER_ROUND);
+  const totalQ = session.totalQuestions ?? TOTAL_PER_ROUND;
+  const hintLimit = session.hintLimit ?? HINT_LIMIT;
+
+  const correctCount = session.correctCount ?? 0;
+  const wrongCount = session.wrongCount ?? 0;
+  const hintsUsed = session.hintsUsed ?? 0;
+  const hintsLeft = Math.max(0, hintLimit - hintsUsed);
+
+  function persist(next: PracticeSession) {
+    saveSession(next);
+    setSession(next);
+  }
 
   function togglePause() {
     const next = { ...session, paused: !session.paused };
-    saveSession(next);
-    setSession(next);
+    persist(next);
 
-    if (next.paused) {
-      setMessage("已暫停。請點上方「▶ 繼續」後再操作。");
-    } else {
-      setMessage(null);
-    }
+    if (next.paused) setMessage("已暫停。請點上方「▶ 繼續」後再操作。");
+    else setMessage(null);
   }
 
   function back() {
@@ -151,15 +162,15 @@ export default function PracticeSessionClient() {
   }
 
   function selectChoice(choiceId: string) {
-    if (session.paused || roundDone) return;
-    if (hasSubmitted) return; // ✅ 提交後不允許再改選，避免重複計分混亂
+    if (session.paused || session.roundDone) return;
+    if (hasSubmitted) return; // 提交後不允許改選
     setSelectedChoiceId(choiceId);
     setMessage(null);
   }
 
   function submit() {
-    if (session.paused || roundDone) return;
-    if (hasSubmitted) return; // ✅ 防止重複提交重複加分
+    if (session.paused || session.roundDone) return;
+    if (hasSubmitted) return; // ✅ 防重複計分
 
     if (!selectedChoiceId) {
       setMessage("請先選擇一個答案。");
@@ -172,22 +183,22 @@ export default function PracticeSessionClient() {
     setHasSubmitted(true);
 
     if (isCorrect) {
-      setCorrectCount((x) => x + 1);
+      const next = { ...session, correctCount: correctCount + 1 };
+      persist(next);
       setMessage("答對了！請繼續下一題。");
-      // ✅ 答對後提示卡可保留或清掉；你之前希望答對後自動消失，這裡先清掉提示
       setHintText(null);
     } else {
-      setWrongCount((x) => x + 1);
+      const next = { ...session, wrongCount: wrongCount + 1 };
+      persist(next);
       setMessage("很可惜，這題沒有答對。你可以再試一次或使用提示。");
-      // ❗答錯仍保留提示（若已顯示）
     }
   }
 
   function useHint() {
-    if (session.paused || roundDone) return;
+    if (session.paused || session.roundDone) return;
 
     if (hintsLeft <= 0) {
-      setHintText("提示已用完（本回合上限 5 次）。");
+      setHintText(`提示已用完（本回合上限 ${hintLimit} 次）。`);
       return;
     }
 
@@ -197,12 +208,14 @@ export default function PracticeSessionClient() {
       currentQuestion.hints[currentQuestion.hints.length - 1] ??
       "（暫無提示）";
 
-    setHintsUsed((x) => x + 1);
-    setHintText(text); // ✅ 覆蓋前一次提示內容（符合你要的）
+    const next = { ...session, hintsUsed: hintsUsed + 1 };
+    persist(next);
+
+    setHintText(text); // 覆蓋前一次提示
   }
 
   function nextQuestion() {
-    if (session.paused || roundDone) return;
+    if (session.paused || session.roundDone) return;
 
     if (!selectedChoiceId) {
       setMessage("請先選擇一個答案。");
@@ -213,18 +226,18 @@ export default function PracticeSessionClient() {
       return;
     }
 
-    // ✅ 20 題結束：顯示回合完成畫面
-    if (currentNo >= TOTAL_PER_ROUND) {
-      setRoundDone(true);
+    // ✅ 回合結束
+    if (currentNo >= totalQ) {
+      const next = { ...session, roundDone: true };
+      persist(next);
       setMessage(null);
       return;
     }
 
     const next = { ...session, currentIndex: session.currentIndex + 1 };
-    saveSession(next);
-    setSession(next);
+    persist(next);
 
-    // 清本題狀態
+    // 重置本題狀態
     setSelectedChoiceId(null);
     setHasSubmitted(false);
     setMessage(null);
@@ -232,7 +245,7 @@ export default function PracticeSessionClient() {
   }
 
   function finishRoundGoPractice() {
-    // 先清掉「本回合」續做（你後面要留紀錄也可以改）
+    // 先清掉本回合續做（你要保留已完成紀錄也可以改成只標記完成不清）
     clearSession();
     router.replace("/practice");
   }
@@ -242,8 +255,7 @@ export default function PracticeSessionClient() {
     whiteSpace: "nowrap",
   };
 
-  // ✅ 回合完成畫面
-  if (roundDone) {
+  if (session.roundDone) {
     return (
       <main style={ui.wrap}>
         <h1 style={{ margin: "0 0 12px", fontSize: 28, fontWeight: 900 }}>回合完成 ✅</h1>
@@ -253,11 +265,11 @@ export default function PracticeSessionClient() {
           <p style={{ margin: "10px 0 0", opacity: 0.8, lineHeight: 1.7 }}>
             科目：{session.subject}
             <br />
-            題數：{TOTAL_PER_ROUND}
+            題數：{totalQ}
             <br />
             對：{correctCount}　錯：{wrongCount}
             <br />
-            提示：{HINT_LIMIT}/{hintsUsed}
+            提示：{hintLimit}/{hintsUsed}
             <br />
             總用時：{formatTime(session.elapsedSec)}
           </p>
@@ -284,7 +296,7 @@ export default function PracticeSessionClient() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
           <div style={pillStyle}>科目：{session.subject}</div>
           <div style={pillStyle}>
-            第 {shownNo} / {TOTAL_PER_ROUND}
+            第 {shownNo} / {totalQ}
           </div>
           <div style={pillStyle}>⏱ {formatTime(session.elapsedSec)}</div>
         </div>
@@ -298,7 +310,6 @@ export default function PracticeSessionClient() {
           </button>
         </div>
 
-        {/* 暫停提醒卡 */}
         {session.paused && (
           <div style={{ ...ui.card, marginTop: 12, background: "#fff" }}>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>提醒</h3>
@@ -314,19 +325,17 @@ export default function PracticeSessionClient() {
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>題目</h2>
 
-          {/* ✅ 右側只放 對/錯/提示（你要求移除題目右上角提示欄） */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
             <div style={{ ...pillStyle, padding: "8px 12px" }}>對 {correctCount}</div>
             <div style={{ ...pillStyle, padding: "8px 12px" }}>錯 {wrongCount}</div>
             <div style={{ ...pillStyle, padding: "8px 12px" }}>
-              提示 {HINT_LIMIT}/{hintsUsed}
+              提示 {hintLimit}/{hintsUsed}
             </div>
           </div>
         </div>
 
         <p style={{ margin: "10px 0 12px", lineHeight: 1.7 }}>{currentQuestion.prompt}</p>
 
-        {/* 選項 */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {currentQuestion.choices.map((c) => {
             const active = selectedChoiceId === c.id;
@@ -350,7 +359,6 @@ export default function PracticeSessionClient() {
           })}
         </div>
 
-        {/* 操作列 */}
         <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button
             onClick={useHint}
@@ -361,7 +369,7 @@ export default function PracticeSessionClient() {
               opacity: session.paused ? 0.6 : 1,
             }}
           >
-            💡 提示（{HINT_LIMIT}/{hintsUsed}）
+            💡 提示（{hintLimit}/{hintsUsed}）
           </button>
 
           <button
@@ -389,17 +397,15 @@ export default function PracticeSessionClient() {
           </button>
         </div>
 
-        {/* 提示內容（會覆蓋） */}
         {hintText && (
           <div style={{ ...ui.card, marginTop: 12, background: "#fff" }}>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>
-              提示（{HINT_LIMIT}/{hintsUsed}）
+              提示（{hintLimit}/{hintsUsed}）
             </h3>
             <p style={{ margin: "8px 0 0", opacity: 0.8, lineHeight: 1.7 }}>{hintText}</p>
           </div>
         )}
 
-        {/* 訊息 */}
         {message && (
           <div style={{ ...ui.card, marginTop: 12, background: "#fff" }}>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>訊息</h3>
