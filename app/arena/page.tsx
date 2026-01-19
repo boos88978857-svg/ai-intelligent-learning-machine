@@ -1,9 +1,11 @@
-export default function Page() {
+import Link from "next/link";
+
+export default function ArenaPage() {
   return (
     <main style={{ padding: 24 }}>
-      <h1>学习竞技场</h1>
-      <p>这里将放对战/排名/任务等竞技功能入口。</p>
-      <a href="/">← 回首页</a>
+      <h1>學習競技場</h1>
+      <p>先把入口與路由打通，之後再做對戰／排名／任務。</p>
+      <p><Link href="/">回首頁</Link></p>
     </main>
   );
 }
