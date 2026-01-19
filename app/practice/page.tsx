@@ -9,6 +9,7 @@ import {
   newSession,
   saveSession,
   PracticeSession,
+  Subject,
 } from "../lib/session";
 
 function formatTime(sec: number) {
@@ -25,7 +26,7 @@ export default function PracticeHubPage() {
     setSession(loadSession());
   }, []);
 
-  function start(subject: PracticeSession["subject"]) {
+  function start(subject: Subject) {
     const s = newSession(subject);
     saveSession(s);
     setSession(s);
@@ -53,7 +54,6 @@ export default function PracticeHubPage() {
       {session ? (
         <div style={ui.card}>
           <h2 style={ui.cardTitle}>未完成進度</h2>
-
           <p style={ui.cardDesc}>
             科目：{session.subject}
             <br />
@@ -73,20 +73,7 @@ export default function PracticeHubPage() {
             </button>
           </div>
 
-          <button
-            onClick={() => router.back()}
-            style={{
-              display: "inline-block",
-              marginTop: 14,
-              color: "#1d4ed8",
-              background: "none",
-              border: "none",
-              padding: 0,
-              fontSize: 16,
-              cursor: "pointer",
-              textDecoration: "underline",
-            }}
-          >
+          <button onClick={() => router.back()} style={ui.backLink}>
             ← 回上一頁
           </button>
         </div>
@@ -99,7 +86,6 @@ export default function PracticeHubPage() {
             >
               <h2 style={ui.cardTitle}>開始英文練習</h2>
               <p style={ui.cardDesc}>建立一個新作答進度（可中斷續做）</p>
-              <span style={ui.smallLink}>開始 →</span>
             </button>
 
             <button
@@ -108,24 +94,10 @@ export default function PracticeHubPage() {
             >
               <h2 style={ui.cardTitle}>開始數學練習</h2>
               <p style={ui.cardDesc}>建立一個新作答進度（可中斷續做）</p>
-              <span style={ui.smallLink}>開始 →</span>
             </button>
           </div>
 
-          <button
-            onClick={() => router.back()}
-            style={{
-              display: "inline-block",
-              marginTop: 14,
-              color: "#1d4ed8",
-              background: "none",
-              border: "none",
-              padding: 0,
-              fontSize: 16,
-              cursor: "pointer",
-              textDecoration: "underline",
-            }}
-          >
+          <button onClick={() => router.back()} style={ui.backLink}>
             ← 回上一頁
           </button>
         </>
