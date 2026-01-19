@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ui } from "../ui";
 
@@ -29,18 +28,14 @@ export default function ArenaPage() {
         </div>
       </div>
 
-      {/* 底部操作區：返回 */}
-      <div style={{ marginTop: 20, display: "flex", gap: 12, flexWrap: "wrap" }}>
+      {/* 只保留回上一頁（回首頁用上方導覽） */}
+      <div style={{ marginTop: 20 }}>
         <button
           onClick={() => router.back()}
           style={{ ...ui.navBtn, cursor: "pointer" }}
         >
           ← 回上一頁
         </button>
-
-        <Link href="/" style={ui.navBtn}>
-          回首頁
-        </Link>
       </div>
     </main>
   );
