@@ -1,34 +1,89 @@
 // app/lib/question.ts
-// 題目規格（Question Schema）
-// 這是整個作答系統的核心定義，之後所有題型都會吃這個結構
 
-export type QuestionType =
-  | "choice"        // 選擇題
-  | "fill"          // 填空題
-  | "application"   // 應用題（數學）
-  | "listening";    // 聽力題
+export type Subject = "英文" | "數學" | "其他";
 
-export interface Question {
+export type QuestionType = "choice" | "fill" | "application";
+
+export type QuestionTools = {
+  whiteboard?: boolean; // 塗鴉白板
+  abacus?: boolean;     // 算盤
+};
+
+export type ChoiceOption = {
   id: string;
+  text: string;
+};
 
-  subject: "英文" | "數學";
-  type: QuestionType;
+export type Question =
+  | {
+      id: string;
+      subject: Subject;
+      type: "choice";
+      prompt: string;
+      hint?: string;
+      tools?: QuestionTools;
+      options: ChoiceOption[];
+      answerId: string; // 正確選項 id
+    }
+  | {
+      id: string;
+      subject: Subject;
+      type: "fill";
+      prompt: string;
+      hint?: string;
+      tools?: QuestionTools;
+      answerText: string; // 正確答案（先用字串，之後可進階成多答案/正則）
+    }
+  | {
+      id: string;
+      subject: Subject;
+      type: "application";
+      prompt: string;
+      hint?: string;
+      tools?: QuestionTools;
+      answerText: string; // 應用題先用「參考答案」字串（之後可改成步驟/評分）
+    };
 
-  // 題目本體
-  prompt: string;
+// 先做「示範題庫」，之後你會換成真正題庫/後端
+export function getMockQuestion(subject: Subject): Question {
+  if (subject === "英文") {
+    return {
+      id: "en-demo-1",
+      subject: "英文",
+      type: "choice",
+      prompt: "（示範）Which one is a fruit?",
+      hint: "想想常見水果",
+      tools: { whiteboard: false, abacus: false },
+      options: [
+        { id: "a", text: "Apple" },
+        { id: "b", text: "Chair" },
+        { id: "c", text: "Book" },
+        { id: "d", text: "Shoe" },
+      ],
+      answerId: "a",
+    };
+  }
 
-  // 選擇題用
-  options?: string[];
+  if (subject === "數學") {
+    return {
+      id: "math-demo-1",
+      subject: "數學",
+      type: "application",
+      prompt: "（示範）小明有 12 顆糖，平均分給 3 個朋友，每人可以分到幾顆？",
+      hint: "想想除法",
+      tools: { whiteboard: true, abacus: true },
+      answerText: "12 ÷ 3 = 4（每人 4 顆）",
+    };
+  }
 
-  // 正確答案（目前先不用，之後判斷用）
-  answer?: string | number;
-
-  // 提示文字（可選）
-  hint?: string;
-
-  // 是否需要輔助工具
-  tools?: {
-    whiteboard?: boolean; // 涂鴉板
-    abacus?: boolean;     // 算盤
+  // 其他學科先給填空示範
+  return {
+    id: "other-demo-1",
+    subject: "其他",
+    type: "fill",
+    prompt: "（示範）台灣的首都是哪裡？",
+    hint: "兩個字",
+    tools: { whiteboard: false, abacus: false },
+    answerText: "台北",
   };
 }
