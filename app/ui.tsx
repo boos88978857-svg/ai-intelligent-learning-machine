@@ -180,4 +180,28 @@ export const ui = {
     border: "2px solid #fb923c",
     fontWeight: 900,
   } as CSSProperties,
+
+  /* ===== 辅助样式（补齐用） ===== */
+  smallLink: {
+    fontSize: 14,
+    color: "#555",
+    textDecoration: "underline",
+    cursor: "pointer",
+  } as CSSProperties,
+
+  backLink: {
+    marginTop: 16,
+    fontSize: 14,
+    color: "#333",
+    cursor: "pointer",
+    background: "none",
+    border: "none",
+    padding: 0,
+  } as CSSProperties,
+
+  grid2: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 16,
+  } as CSSProperties,
 };
