@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ui } from "../../ui";
 import { loadSession, saveSession, PracticeSession } from "../../lib/session";
+import { Question } from "../../lib/question";
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60);
