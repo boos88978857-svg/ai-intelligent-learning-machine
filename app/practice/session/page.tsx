@@ -151,6 +151,7 @@ export default function PracticeSessionPage() {
 
   function submit() {
     if (session.paused || roundDone) return;
+if (hasSubmitted) return;
 
     if (!selectedChoiceId) {
       setMessage("請先選擇一個答案。");
@@ -358,29 +359,29 @@ export default function PracticeSessionPage() {
             💡 提示（{HINT_LIMIT}/{hintsUsed}）
           </button>
 
-          <button
-            onClick={submit}
-            disabled={session.paused}
-            style={{
-              ...ui.navBtn,
-              cursor: session.paused ? "not-allowed" : "pointer",
-              opacity: session.paused ? 0.6 : 1,
-            }}
-          >
-            ✅ 提交答案
-          </button>
+        <button
+  onClick={submit}
+  disabled={session.paused || hasSubmitted}   // ✅ 提交後不能再按
+  style={{
+    ...ui.navBtn,
+    cursor: session.paused || hasSubmitted ? "not-allowed" : "pointer",
+    opacity: session.paused || hasSubmitted ? 0.6 : 1,
+  }}
+>
+  ✅ 提交答案
+</button>
 
           <button
-            onClick={nextQuestion}
-            disabled={session.paused}
-            style={{
-              ...ui.navBtn,
-              cursor: session.paused ? "not-allowed" : "pointer",
-              opacity: session.paused ? 0.6 : 1,
-            }}
-          >
-            下一題 →
-          </button>
+  onClick={nextQuestion}
+  disabled={session.paused || !hasSubmitted}   // ✅ 沒提交不能按
+  style={{
+    ...ui.navBtn,
+    cursor: session.paused || !hasSubmitted ? "not-allowed" : "pointer",
+    opacity: session.paused || !hasSubmitted ? 0.6 : 1,
+  }}
+>
+  下一題 →
+</button>
         </div>
 
         {/* ✅ 提示顯示：點一次顯示、再點覆蓋、答對/下一題時清掉（下一題已清掉） */}
