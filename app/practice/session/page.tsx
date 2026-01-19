@@ -6,16 +6,15 @@ import { useRouter } from "next/navigation";
 import { ui } from "../../ui";
 import { loadSession, saveSession, PracticeSession } from "../../lib/session";
 
-type QuestionType = "single";
+type QuestionType = "mcq" | "application";
 
 type Question = {
   id: string;
   subject: PracticeSession["subject"];
   type: QuestionType;
   prompt: string;
-  options: { id: string; text: string; correct?: boolean }[];
-  hint: string;
-  tools?: { whiteboard?: boolean; abacus?: boolean };
+  hint?: string;
+  choices?: string[]; // mcq 用
 };
 
 function formatTime(sec: number) {
@@ -24,19 +23,45 @@ function formatTime(sec: number) {
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
+/** 假題庫（示範用） */
+const demoBank: Question[] = [
+  {
+    id: "en-1",
+    subject: "英文",
+    type: "mcq",
+    prompt: "（示範）Which one is a fruit?",
+    hint: "想想常見水果",
+    choices: ["Apple", "Chair", "Book", "Shoe"],
+  },
+  {
+    id: "math-1",
+    subject: "數學",
+    type: "application",
+    prompt: "（示範）小明有 12 顆糖，平均分給 3 個朋友，每人可以分到幾顆？",
+    hint: "想想除法",
+  },
+];
+
 export default function PracticeSessionPage() {
   const router = useRouter();
+
   const [session, setSession] = useState<PracticeSession | null>(null);
 
-  // === Step 3 狀態：提示/答案/統計（先用 local state，之後再進階存回 session） ===
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
+  // 作答 UI 狀態（不寫進 session）
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [toast, setToast] = useState<string>("");
+  const [hintUsed, setHintUsed] = useState(0); // 0~3
+  const [lockUI, setLockUI] = useState(false); // 提交後短暫鎖住，避免連點
 
-  // 提示 3 次上限
-  const [hintUsed, setHintUsed] = useState(0);
-  const [showHint, setShowHint] = useState(false);
+  /** 依科目挑題：先用示範題，之後你會換成真題庫 */
+  const question = useMemo(() => {
+    if (!session) return null;
+    // 先找同科目第一題示範（你之後會用 session.currentIndex 去拿題）
+    const q = demoBank.find((x) => x.subject === session.subject) ?? demoBank[0];
+    return q;
+  }, [session]);
 
   // 載入續做資料
   useEffect(() => {
@@ -48,7 +73,7 @@ export default function PracticeSessionPage() {
     setSession(s);
   }, [router]);
 
-  // 簡單計時（每秒 +1）
+  // 每秒計時（進行中才跑）
   useEffect(() => {
     if (!session || session.paused) return;
 
@@ -64,60 +89,7 @@ export default function PracticeSessionPage() {
     return () => clearInterval(timer);
   }, [session]);
 
-  // 假題目：先依科目顯示不同題幹（之後換題庫）
-  const question: Question = useMemo(() => {
-    if (!session) {
-      return {
-        id: "demo-1",
-        subject: "英文",
-        type: "single",
-        prompt: "(示範) Which one is a fruit?",
-        hint: "想想常見水果",
-        options: [
-          { id: "a", text: "Apple", correct: true },
-          { id: "b", text: "Chair" },
-          { id: "c", text: "Book" },
-          { id: "d", text: "Shoe" },
-        ],
-        tools: { whiteboard: false, abacus: false },
-      };
-    }
-
-    if (session.subject === "數學") {
-      return {
-        id: "demo-m-1",
-        subject: "數學",
-        type: "single",
-        prompt: "(示範) 小明有 12 顆糖，平均分給 3 個朋友，每人可以分到幾顆？",
-        hint: "想想除法",
-        options: [
-          { id: "a", text: "3" },
-          { id: "b", text: "4", correct: true },
-          { id: "c", text: "6" },
-          { id: "d", text: "12" },
-        ],
-        tools: { whiteboard: true, abacus: true },
-      };
-    }
-
-    // 英文
-    return {
-      id: "demo-e-1",
-      subject: "英文",
-      type: "single",
-      prompt: "(示範) Which one is a fruit?",
-      hint: "想想常見水果",
-      options: [
-        { id: "a", text: "Apple", correct: true },
-        { id: "b", text: "Chair" },
-        { id: "c", text: "Book" },
-        { id: "d", text: "Shoe" },
-      ],
-      tools: { whiteboard: true, abacus: false },
-    };
-  }, [session]);
-
-  if (!session) return null;
+  if (!session || !question) return null;
 
   function togglePause() {
     const next = { ...session, paused: !session.paused };
@@ -129,45 +101,71 @@ export default function PracticeSessionPage() {
     router.back();
   }
 
-  function onSelect(id: string) {
-    if (submitted) return;
-    setSelectedId(id);
+  function showHint() {
+    if (hintUsed >= 3) return;
+    setHintUsed((n) => n + 1);
+    setToast(question.hint ? `提示：${question.hint}` : "提示：這題先從題目關鍵字下手。");
+    window.setTimeout(() => setToast(""), 1800);
   }
 
-  function submitAnswer() {
-    if (!selectedId || submitted) return;
-    setSubmitted(true);
-
-    const picked = question.options.find((o) => o.id === selectedId);
-    const ok = !!picked?.correct;
-    if (ok) setCorrectCount((n) => n + 1);
-    else setWrongCount((n) => n + 1);
+  /** 你之後會接真判題：目前用 demo 規則 */
+  function isAnswerCorrect(): boolean {
+    if (question.type === "mcq") {
+      return selected === "Apple"; // demo：英文題正確是 Apple
+    }
+    if (question.type === "application") {
+      // demo：先不做輸入題，直接讓它永遠正確（只是示範流程）
+      return true;
+    }
+    return false;
   }
 
-  function nextQuestion() {
-    // 這裡先用「假下一題」：題號 +1、清掉作答狀態
-    const next = { ...session, currentIndex: session.currentIndex + 1, paused: false };
+  function nextQuestionSoft() {
+    // 下一題：先做「題號 +1」示範（你之後會換成真正的題庫索引）
+    const next = { ...session, currentIndex: session.currentIndex + 1 };
     saveSession(next);
     setSession(next);
 
-    setSelectedId(null);
-    setSubmitted(false);
-    setShowHint(false);
-    // hintUsed 保留（同一次作答最多 3 次）
+    // UI reset
+    setSelected(null);
+    setToast("");
+    setHintUsed(0);
+    setLockUI(false);
   }
 
-  function useHint() {
-    if (hintUsed >= 3) return;
-    setHintUsed((n) => n + 1);
-    setShowHint(true);
-  }
+  function submitAnswer() {
+    if (lockUI) return;
 
-  const hintLabel = `提示（3/${Math.min(hintUsed + 1, 3)}）`;
-  const hintStatus = `提示次數：3/${hintUsed}`;
+    // mcq 沒選不給交
+    if (question.type === "mcq" && !selected) {
+      setToast("請先選一個答案。");
+      window.setTimeout(() => setToast(""), 1400);
+      return;
+    }
+
+    setLockUI(true);
+
+    const ok = isAnswerCorrect();
+    if (ok) {
+      setCorrectCount((n) => n + 1);
+      setToast("答對了！下一題準備中…");
+      window.setTimeout(() => {
+        setToast("");
+        nextQuestionSoft();
+      }, 600); // 不要太快
+    } else {
+      setWrongCount((n) => n + 1);
+      setToast("很可惜，這題沒有答對。再試一次或使用提示。");
+      window.setTimeout(() => {
+        setToast("");
+        setLockUI(false); // 錯了不跳題，解鎖讓他重新選
+      }, 900);
+    }
+  }
 
   return (
     <main style={ui.wrap}>
-      <h1 style={{ margin: "0 0 12px", fontSize: 28, fontWeight: 900 }}>
+      <h1 style={{ margin: "0 0 12px", fontSize: 30, fontWeight: 900 }}>
         作答中（{session.subject}）
       </h1>
 
@@ -182,51 +180,14 @@ export default function PracticeSessionPage() {
           計時：{formatTime(session.elapsedSec)}
           <br />
           狀態：{session.paused ? "已暫停" : "進行中"}
-          <br />
-          對：{correctCount} / 錯：{wrongCount}
-          <br />
-          {hintStatus}
         </p>
 
-        <div style={{ marginTop: 14, display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+          <span style={{ ...ui.navBtn, cursor: "default" }}>對：{correctCount}</span>
+          <span style={{ ...ui.navBtn, cursor: "default" }}>錯：{wrongCount}</span>
+
           <button onClick={togglePause} style={{ ...ui.navBtn, cursor: "pointer" }}>
             {session.paused ? "▶ 繼續" : "⏸ 暫停"}
-          </button>
-
-          <button
-            onClick={useHint}
-            disabled={hintUsed >= 3}
-            style={{
-              ...ui.navBtn,
-              cursor: hintUsed >= 3 ? "not-allowed" : "pointer",
-              opacity: hintUsed >= 3 ? 0.5 : 1,
-            }}
-          >
-            {hintLabel}
-          </button>
-
-          <button
-            onClick={submitAnswer}
-            disabled={!selectedId || submitted || session.paused}
-            style={{
-              ...ui.navBtn,
-              cursor: !selectedId || submitted || session.paused ? "not-allowed" : "pointer",
-              opacity: !selectedId || submitted || session.paused ? 0.5 : 1,
-            }}
-          >
-            提交答案
-          </button>
-
-          <button
-            onClick={nextQuestion}
-            disabled={!submitted}
-            style={{
-              ...ui.navBtn,
-              cursor: !submitted ? "not-allowed" : "pointer",
-              opacity: !submitted ? 0.5 : 1,
-            }}
-          >
-            下一題 →
           </button>
 
           <button onClick={back} style={{ ...ui.navBtn, cursor: "pointer" }}>
@@ -236,47 +197,96 @@ export default function PracticeSessionPage() {
       </div>
 
       {/* 題目卡 */}
-      <div style={{ ...ui.card, marginTop: 16 }}>
+      <div style={{ ...ui.card, marginTop: 14 }}>
         <h2 style={ui.cardTitle}>題目</h2>
-        <p style={ui.cardDesc}>{question.prompt}</p>
 
-        {showHint && (
-          <div style={{ ...ui.card, marginTop: 12, background: "#fff" as any }}>
-            <h3 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 800 }}>提示</h3>
-            <p style={{ margin: 0, opacity: 0.85, lineHeight: 1.7 }}>{question.hint}</p>
+        <p style={{ ...ui.cardDesc, marginTop: 10 }}>
+          {question.prompt}
+          <br />
+          <span style={{ opacity: 0.75 }}>
+            提示次數：{hintUsed}/3
+          </span>
+        </p>
+
+        {/* 選擇題區 */}
+        {question.type === "mcq" && question.choices && (
+          <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+            {question.choices.map((c) => {
+              const active = selected === c;
+              return (
+                <button
+                  key={c}
+                  disabled={session.paused || lockUI}
+                  onClick={() => setSelected(c)}
+                  style={{
+                    ...ui.card,
+                    textAlign: "left",
+                    cursor: session.paused || lockUI ? "not-allowed" : "pointer",
+                    border: active ? "2px solid rgba(29,78,216,0.7)" : "1px solid rgba(0,0,0,0.15)",
+                    background: active ? "rgba(29,78,216,0.06)" : "white",
+                  }}
+                >
+                  <div style={{ fontSize: 18, fontWeight: 800 }}>{c}</div>
+                  {active && <div style={{ marginTop: 6, opacity: 0.7 }}>已選取</div>}
+                </button>
+              );
+            })}
           </div>
         )}
 
-        <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
-          {question.options.map((opt) => {
-            const isPicked = selectedId === opt.id;
-            const isCorrect = submitted && opt.correct;
-            const isWrongPicked = submitted && isPicked && !opt.correct;
+        {/* 應用題示範區（先佔位，之後你會換成輸入框/草稿/工具） */}
+        {question.type === "application" && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ ...ui.card, opacity: 0.9 }}>
+              <div style={{ fontWeight: 800, marginBottom: 8 }}>作答區（示範佔位）</div>
+              <div style={{ opacity: 0.75, lineHeight: 1.6 }}>
+                之後你會在這裡放：
+                <br />- 數字輸入 / 算式輸入
+                <br />- 涂鴉白板
+                <br />- 算盤工具
+              </div>
+            </div>
+          </div>
+        )}
 
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onSelect(opt.id)}
-                disabled={session.paused}
-                style={{
-                  ...ui.card,
-                  cursor: session.paused ? "not-allowed" : "pointer",
-                  textAlign: "left",
-                  outline: isPicked ? "2px solid rgba(29,78,216,0.6)" : "none",
-                  background: isCorrect ? "rgba(34,197,94,0.12)" : isWrongPicked ? "rgba(239,68,68,0.10)" : "white",
-                }}
-              >
-                <div style={{ fontWeight: 800, fontSize: 18 }}>{opt.text}</div>
-                {submitted && isCorrect && <div style={{ marginTop: 6, opacity: 0.8 }}>✅ 正確答案</div>}
-                {submitted && isWrongPicked && <div style={{ marginTop: 6, opacity: 0.8 }}>❌ 你選錯了</div>}
-              </button>
-            );
-          })}
+        {/* 操作列：提示 / 提交 / 下一題 */}
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 14 }}>
+          <button
+            onClick={showHint}
+            disabled={session.paused || hintUsed >= 3 || lockUI}
+            style={{ ...ui.navBtn, cursor: session.paused || hintUsed >= 3 || lockUI ? "not-allowed" : "pointer" }}
+          >
+            💡 提示（{hintUsed}/3）
+          </button>
+
+          <button
+            onClick={submitAnswer}
+            disabled={session.paused || lockUI}
+            style={{ ...ui.navBtn, cursor: session.paused || lockUI ? "not-allowed" : "pointer" }}
+          >
+            ✅ 提交答案
+          </button>
+
+          <button
+            onClick={() => {
+              setToast("已跳過（示範）。");
+              window.setTimeout(() => setToast(""), 700);
+              nextQuestionSoft();
+            }}
+            disabled={session.paused || lockUI}
+            style={{ ...ui.navBtn, cursor: session.paused || lockUI ? "not-allowed" : "pointer" }}
+          >
+            下一題 →
+          </button>
         </div>
 
-        <div style={{ marginTop: 14, opacity: 0.6, lineHeight: 1.7 }}>
-          ※ 白板 / 算盤：下一步會用「工具列」方式做成可開關的面板（先把題目與操作流程打通）。
-        </div>
+        {/* 提示/回饋訊息 */}
+        {toast && (
+          <div style={{ marginTop: 12, ...ui.card, background: "rgba(0,0,0,0.03)" }}>
+            <div style={{ fontWeight: 800, marginBottom: 6 }}>訊息</div>
+            <div style={{ opacity: 0.85, lineHeight: 1.6 }}>{toast}</div>
+          </div>
+        )}
       </div>
     </main>
   );
