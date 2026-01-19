@@ -13,9 +13,12 @@ type Question = {
   subject: PracticeSession["subject"];
   type: QuestionType;
   prompt: string;
-  hints?: string[]; // 最多 3 條提示
+  hints?: string[]; // 最多 5 條提示（用不到也沒關係）
   choices?: string[]; // mcq 用
 };
+
+const ROUND_QUESTIONS = 20; // ✅ 一回合 20 題
+const MAX_HINTS = 5;        // ✅ 一回合 5 次提示
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60);
@@ -30,7 +33,7 @@ const demoBank: Question[] = [
     subject: "英文",
     type: "mcq",
     prompt: "（示範）Which one is a fruit?",
-    hints: ["想想常見水果", "水果通常可以吃", "Apple 是水果，其他是物品"],
+    hints: ["想想常見水果", "水果通常可以吃", "Apple 是水果，其他是物品", "再想想「食物」類", "Apple 最符合"],
     choices: ["Apple", "Chair", "Book", "Shoe"],
   },
   {
@@ -38,7 +41,7 @@ const demoBank: Question[] = [
     subject: "數學",
     type: "application",
     prompt: "（示範）小明有 12 顆糖，平均分給 3 個朋友，每人可以分到幾顆？",
-    hints: ["想想除法", "12 ÷ 3", "每人分到 4 顆"],
+    hints: ["想想除法", "12 ÷ 3", "每人分到 4 顆", "把 12 平均切 3 份", "答案是 4"],
   },
 ];
 
@@ -53,10 +56,10 @@ export default function PracticeSessionPage() {
   const [selected, setSelected] = useState<string | null>(null);
 
   // ✅ 提示：不自動消失，直到答對進下一題才清掉
-  const [hintUsed, setHintUsed] = useState(0); // 0~3
+  const [hintUsed, setHintUsed] = useState(0); // 0~MAX_HINTS
   const [hintText, setHintText] = useState<string>("");
 
-  // 短訊息（例如：未選答案、答錯提醒等）
+  // 訊息（答錯/提醒等）
   const [toast, setToast] = useState<string>("");
 
   const [lockUI, setLockUI] = useState(false);
@@ -94,9 +97,9 @@ export default function PracticeSessionPage() {
 
   if (!session || !question) return null;
 
-  // ✅ 顯示格式：3/1、3/2、3/3
+  // ✅ 顯示格式：5/0、5/1、5/2…
   function hintCounterLabel() {
-    return `3/${Math.min(hintUsed, 3)}`;
+    return `${MAX_HINTS}/${Math.min(hintUsed, MAX_HINTS)}`;
   }
 
   function togglePause() {
@@ -111,20 +114,28 @@ export default function PracticeSessionPage() {
 
   // ✅ 點一次提示 → 顯示下一條（覆蓋上一條），不自動消失
   function showHint() {
-    if (hintUsed >= 3) return;
+    if (hintUsed >= MAX_HINTS) return;
 
     const hints =
-      question.hints ?? ["提示：先抓題目關鍵字。", "提示：拆成兩步想。", "提示：先用最簡單方法試算。"];
+      question.hints ?? [
+        "提示：先抓題目關鍵字。",
+        "提示：拆成兩步想。",
+        "提示：先用最簡單方法試算。",
+        "提示：回頭檢查題意。",
+        "提示：用排除法。",
+      ];
 
     const nextUsed = hintUsed + 1;
+
+    // 若題庫提示不足 5 條，就用最後一條補齊
     const nextText = hints[nextUsed - 1] ?? hints[hints.length - 1];
 
     setHintUsed(nextUsed);
     setHintText(nextText);
 
-    // toast 只是輕提示（不影響提示視窗）
-    setToast(`已顯示提示（3/${nextUsed}）`);
-    window.setTimeout(() => setToast(""), 700);
+    // 小提示（不影響提示視窗）
+    setToast(`已顯示提示（${MAX_HINTS}/${nextUsed}）`);
+    window.setTimeout(() => setToast(""), 800);
   }
 
   /** demo 判題 */
@@ -142,7 +153,6 @@ export default function PracticeSessionPage() {
 
     setSelected(null);
     setToast("");
-    setHintUsed(0);
     setHintText("");
     setLockUI(false);
   }
@@ -152,7 +162,7 @@ export default function PracticeSessionPage() {
 
     if (question.type === "mcq" && !selected) {
       setToast("請先選一個答案。");
-      window.setTimeout(() => setToast(""), 1100);
+      window.setTimeout(() => setToast(""), 1200);
       return;
     }
 
@@ -162,20 +172,28 @@ export default function PracticeSessionPage() {
     if (ok) {
       setCorrectCount((n) => n + 1);
       setToast("答對了！下一題準備中…");
+
+      // ✅ 答對跳題速度不要太快（稍微慢一點）
       window.setTimeout(() => {
-        nextQuestionSoft(); // ✅ 答對跳題後提示自動消失
-      }, 650);
+        // 答對進下一題時，提示自動消失（符合你需求）
+        setHintText("");
+        nextQuestionSoft();
+      }, 850);
     } else {
       setWrongCount((n) => n + 1);
+
+      // ✅ 文案：不要「你選錯了」，改成「很可惜…」
       setToast("很可惜，這題沒有答對。你可以再試一次或使用提示。");
+
+      // ✅ 顯示久一點
       window.setTimeout(() => {
         setToast("");
         setLockUI(false);
-      }, 900);
+      }, 2600);
     }
   }
 
-  // ✅ 讓手機一頁內更容易看到：縮小間距與卡片 padding
+  // ✅ 讓手機更容易一頁顯示：縮小 padding
   const compactWrap = {
     ...ui.wrap,
     paddingTop: 10,
@@ -189,20 +207,18 @@ export default function PracticeSessionPage() {
 
   return (
     <main style={compactWrap}>
-      {/* ✅ 標題縮小、佔位更少 */}
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1.2 }}>作答中</div>
       </div>
 
-      {/* ✅ 狀態列：改成「一排資訊 + 一排按鈕」，題目區就能更往上 */}
+      {/* ✅ 狀態列：移除「提示 5/0」與 對/錯（避免上面重複） */}
       <section style={compactCard}>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <span style={{ ...ui.navBtn, cursor: "default" }}>科目：{session.subject}</span>
-          <span style={{ ...ui.navBtn, cursor: "default" }}>第 {session.currentIndex + 1} 題</span>
+          <span style={{ ...ui.navBtn, cursor: "default" }}>
+            第 {session.currentIndex + 1} 題 / {ROUND_QUESTIONS}
+          </span>
           <span style={{ ...ui.navBtn, cursor: "default" }}>⏱ {formatTime(session.elapsedSec)}</span>
-          <span style={{ ...ui.navBtn, cursor: "default" }}>對 {correctCount}</span>
-          <span style={{ ...ui.navBtn, cursor: "default" }}>錯 {wrongCount}</span>
-          <span style={{ ...ui.navBtn, cursor: "default" }}>提示 {hintCounterLabel()}</span>
         </div>
 
         <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -216,16 +232,22 @@ export default function PracticeSessionPage() {
         </div>
       </section>
 
-      {/* ✅ 題目卡：往上提、間距縮小 */}
+      {/* 題目卡 */}
       <section style={{ ...compactCard, marginTop: 10 }}>
+        {/* ✅ 右上角：放「對/錯/提示」(把你說多餘的區塊用起來) */}
         <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
           <h2 style={{ ...ui.cardTitle, margin: 0 }}>題目</h2>
-          <span style={{ opacity: 0.75, fontWeight: 700 }}>提示：{hintCounterLabel()}</span>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <span style={{ ...ui.navBtn, cursor: "default" }}>對 {correctCount}</span>
+            <span style={{ ...ui.navBtn, cursor: "default" }}>錯 {wrongCount}</span>
+            <span style={{ ...ui.navBtn, cursor: "default" }}>提示：{hintCounterLabel()}</span>
+          </div>
         </div>
 
         <p style={{ ...ui.cardDesc, marginTop: 10 }}>{question.prompt}</p>
 
-        {/* ✅ 提示視窗：一旦顯示就留著，覆蓋更新，不自動收 */}
+        {/* 提示視窗：顯示後保留，直到答對跳題才清掉 */}
         {hintText && (
           <div style={{ marginTop: 10, ...compactCard, background: "rgba(29,78,216,0.06)" }}>
             <div style={{ fontWeight: 900, marginBottom: 6 }}>提示（{hintCounterLabel()}）</div>
@@ -240,7 +262,6 @@ export default function PracticeSessionPage() {
               display: "grid",
               gap: 10,
               marginTop: 10,
-              // ✅ 自動變欄數：手機直向大多 2 欄，減少高度、避免滑動
               gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
             }}
           >
@@ -279,14 +300,14 @@ export default function PracticeSessionPage() {
           </div>
         )}
 
-        {/* ✅ 操作列：放在題目卡底部，手機一頁內可按到 */}
+        {/* 操作列 */}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
           <button
             onClick={showHint}
-            disabled={session.paused || hintUsed >= 3 || lockUI}
+            disabled={session.paused || hintUsed >= MAX_HINTS || lockUI}
             style={{
               ...ui.navBtn,
-              cursor: session.paused || hintUsed >= 3 || lockUI ? "not-allowed" : "pointer",
+              cursor: session.paused || hintUsed >= MAX_HINTS || lockUI ? "not-allowed" : "pointer",
             }}
           >
             💡 提示（{hintCounterLabel()}）
@@ -303,7 +324,8 @@ export default function PracticeSessionPage() {
           <button
             onClick={() => {
               setToast("已跳過（示範）。");
-              window.setTimeout(() => setToast(""), 700);
+              window.setTimeout(() => setToast(""), 900);
+              setHintText("");
               nextQuestionSoft();
             }}
             disabled={session.paused || lockUI}
@@ -313,7 +335,7 @@ export default function PracticeSessionPage() {
           </button>
         </div>
 
-        {/* ✅ 短訊息 */}
+        {/* 訊息 */}
         {toast && (
           <div style={{ marginTop: 10, ...compactCard, background: "rgba(0,0,0,0.03)", padding: 12 }}>
             <div style={{ fontWeight: 900, marginBottom: 4 }}>訊息</div>
