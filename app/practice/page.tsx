@@ -4,12 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ui } from "../ui";
 import {
-  clearSession,
-  loadSession,
+  loadAllSessions,
   newSession,
-  saveSession,
-  PracticeSession,
-  Subject,
+  removeSession,
 } from "../lib/session";
 
 function formatTime(sec: number) {
@@ -37,10 +34,10 @@ export default function PracticeHubPage() {
     router.push("/practice/session");
   }
 
-  function reset() {
-    clearSession();
-    setSession(null);
-  }
+  function remove(id: string) {
+  removeSession(id);
+  setSessions(loadAllSessions());
+}
 
   return (
     <main style={ui.wrap}>
