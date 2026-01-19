@@ -1,11 +1,11 @@
-import Link from "next/link";
-
+// app/arena/page.tsx
 export default function ArenaPage() {
   return (
-    <main style={{ padding: 24 }}>
-      <h1>學習競技場</h1>
-      <p>先把入口與路由打通，之後再做對戰／排名／任務。</p>
-      <p><Link href="/">回首頁</Link></p>
+    <main>
+      <h1 style={{ margin: "0 0 12px", fontSize: 34, fontWeight: 900 }}>學習競技場</h1>
+      <p style={{ margin: 0, opacity: 0.75 }}>
+        這裡之後放：對戰 / 排名 / 任務等功能（先把入口打通）。
+      </p>
     </main>
   );
 }
