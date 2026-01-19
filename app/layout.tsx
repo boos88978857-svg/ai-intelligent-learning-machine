@@ -1,10 +1,5 @@
-import Link from "next/link";
 import "./globals.css";
-
-export const metadata = {
-  title: "AI 智能学习机",
-  description: "练习型学习系统",
-};
+import Link from "next/link";
 
 export default function RootLayout({
   children,
@@ -15,19 +10,21 @@ export default function RootLayout({
     <html lang="zh">
       <body>
         {/* 顶部导航 */}
-        <nav style={{ padding: 16, borderBottom: "1px solid #ddd" }}>
-          <Link href="/" style={{ marginRight: 16 }}>
-            首页
-          </Link>
-          <Link href="/practice">
-            练习区
-          </Link>
-        </nav>
+        <header
+          style={{
+            padding: "16px 24px",
+            borderBottom: "1px solid #eee",
+            marginBottom: 24,
+          }}
+        >
+          <nav style={{ display: "flex", gap: 16 }}>
+            <Link href="/">首页</Link>
+            <Link href="/practice">练习区</Link>
+          </nav>
+        </header>
 
         {/* 页面内容 */}
-        <main style={{ padding: 24 }}>
-          {children}
-        </main>
+        <main style={{ padding: 24 }}>{children}</main>
       </body>
     </html>
   );
