@@ -1,11 +1,12 @@
-// app/lib/session.ts
+export type Subject = "英文" | "數學";
+
 export type PracticeSession = {
   id: string;
-  subject: "英文" | "數學" | "其他";
+  subject: Subject;
   currentIndex: number; // 第幾題（從 0 開始）
   elapsedSec: number;   // 已用秒數
   paused: boolean;
-  updatedAt: number;    // 時間戳
+  updatedAt: number;    // timestamp
 };
 
 const KEY = "ai_learning_practice_session_v1";
@@ -31,7 +32,7 @@ export function clearSession() {
   window.localStorage.removeItem(KEY);
 }
 
-export function newSession(subject: PracticeSession["subject"]): PracticeSession {
+export function newSession(subject: Subject): PracticeSession {
   return {
     id: crypto.randomUUID(),
     subject,
