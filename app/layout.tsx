@@ -1,73 +1,32 @@
-import type { Metadata } from "next";
-import Link from "next/link";
+// app/layout.tsx
 import "./globals.css";
+import Link from "next/link";
+import { ui } from "./ui";
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "AI 智能學習機",
-  description: "學習入口系統",
+  description: "學習入口與練習系統",
 };
 
-const navWrap: React.CSSProperties = {
-  position: "sticky",
-  top: 0,
-  background: "white",
-  borderBottom: "1px solid rgba(0,0,0,0.08)",
-  padding: 12,
-  zIndex: 10,
-};
-
-const navRow: React.CSSProperties = {
-  display: "flex",
-  gap: 10,
-  flexWrap: "wrap",
-};
-
-const navBtn: React.CSSProperties = {
-  display: "inline-block",
-  padding: "8px 12px",
-  border: "1px solid rgba(0,0,0,0.2)",
-  borderRadius: 10,
-  textDecoration: "none",
-  color: "#1d4ed8",
-  background: "white",
-};
-
-const container: React.CSSProperties = {
-  maxWidth: 980,
-  margin: "0 auto",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-Hant">
       <body>
-        <header style={navWrap}>
-          <div style={container}>
-            <nav style={navRow}>
-              <Link href="/" style={navBtn}>
-                首頁
-              </Link>
-              <Link href="/learn" style={navBtn}>
-                學習區
-              </Link>
-              <Link href="/records" style={navBtn}>
-                記錄
-              </Link>
-              <Link href="/settings" style={navBtn}>
-                設定
-              </Link>
-              <Link href="/about" style={navBtn}>
-                關於
-              </Link>
-            </nav>
-          </div>
-        </header>
+        <div style={ui.page}>
+          {/* 上方導覽（全站一致） */}
+          <nav style={ui.navWrap}>
+            <div style={ui.nav}>
+              <Link href="/" style={ui.navBtn}>首頁</Link>
+              <Link href="/practice" style={ui.navBtn}>學習區</Link>
+              <Link href="/records" style={ui.navBtn}>記錄</Link>
+              <Link href="/settings" style={ui.navBtn}>設定</Link>
+              <Link href="/about" style={ui.navBtn}>關於</Link>
+            </div>
+          </nav>
 
-        <main style={container}>{children}</main>
+          {/* 每頁內容 */}
+          <main style={ui.main}>{children}</main>
+        </div>
       </body>
     </html>
   );
