@@ -1,34 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { ui } from "../ui";
 
 export default function SettingsPage() {
   const router = useRouter();
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1 style={{ margin: "0 0 12px", fontSize: 28, fontWeight: 800 }}>
-        設定
-      </h1>
+    <main style={ui.wrap}>
+      <h1 style={{ margin: "0 0 12px", fontSize: 34, fontWeight: 900 }}>設定</h1>
 
-      <p style={{ opacity: 0.75, lineHeight: 1.7 }}>
-        這裡之後會放使用偏好、音效、音標顯示習慣等設定。
-      </p>
+      <div style={ui.card}>
+        <h2 style={ui.cardTitle}>偏好設定（先佔位）</h2>
+        <p style={ui.cardDesc}>
+          你提的「音標偏好」不是首頁卡片，是做題時由使用者自行切換，並由系統記憶習慣。
+          <br />
+          下一階段我會幫你把「偏好」做成可保存（localStorage → 之後換資料庫）。
+        </p>
+      </div>
 
-      <button
-        onClick={() => router.back()}
-        style={{
-          display: "inline-block",
-          marginTop: 16,
-          color: "#1d4ed8",
-          background: "none",
-          border: "none",
-          padding: 0,
-          fontSize: 16,
-          cursor: "pointer",
-          textDecoration: "underline",
-        }}
-      >
+      <button onClick={() => router.back()} style={ui.backLink}>
         ← 回上一頁
       </button>
     </main>
