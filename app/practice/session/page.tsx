@@ -5,7 +5,18 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ui } from "../../ui";
 import { loadSession, saveSession, PracticeSession } from "../../lib/session";
-import { getMockQuestion, Question } from "../../lib/question";
+
+type QuestionType = "single";
+
+type Question = {
+  id: string;
+  subject: PracticeSession["subject"];
+  type: QuestionType;
+  prompt: string;
+  options: { id: string; text: string; correct?: boolean }[];
+  hint: string;
+  tools?: { whiteboard?: boolean; abacus?: boolean };
+};
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60);
@@ -13,26 +24,19 @@ function formatTime(sec: number) {
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-type AnswerState =
-  | { kind: "none" }
-  | { kind: "choice"; selectedId: string }
-  | { kind: "fill"; text: string }
-  | { kind: "application"; text: string };
-
 export default function PracticeSessionPage() {
   const router = useRouter();
   const [session, setSession] = useState<PracticeSession | null>(null);
 
-  // ✅ 作答狀態（本頁暫存，之後可寫進 session）
-  const [answer, setAnswer] = useState<AnswerState>({ kind: "none" });
-
-  // ✅ 顯示提示
-  const [showHint, setShowHint] = useState(false);
-const [hintCount, setHintCount] = useState(0); // 提示已使用次數（最多 3）
-
-  // ✅ 對/錯統計（先做在本頁，之後再寫進 session）
+  // === Step 3 狀態：提示/答案/統計（先用 local state，之後再進階存回 session） ===
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
+
+  // 提示 3 次上限
+  const [hintUsed, setHintUsed] = useState(0);
+  const [showHint, setShowHint] = useState(false);
 
   // 載入續做資料
   useEffect(() => {
@@ -44,7 +48,7 @@ const [hintCount, setHintCount] = useState(0); // 提示已使用次數（最多
     setSession(s);
   }, [router]);
 
-  // 計時（每秒 +1）
+  // 簡單計時（每秒 +1）
   useEffect(() => {
     if (!session || session.paused) return;
 
@@ -60,17 +64,58 @@ const [hintCount, setHintCount] = useState(0); // 提示已使用次數（最多
     return () => clearInterval(timer);
   }, [session]);
 
-  const question: Question | null = useMemo(() => {
-    if (!session) return null;
-    return getMockQuestion(session.subject);
-  }, [session]);
+  // 假題目：先依科目顯示不同題幹（之後換題庫）
+  const question: Question = useMemo(() => {
+    if (!session) {
+      return {
+        id: "demo-1",
+        subject: "英文",
+        type: "single",
+        prompt: "(示範) Which one is a fruit?",
+        hint: "想想常見水果",
+        options: [
+          { id: "a", text: "Apple", correct: true },
+          { id: "b", text: "Chair" },
+          { id: "c", text: "Book" },
+          { id: "d", text: "Shoe" },
+        ],
+        tools: { whiteboard: false, abacus: false },
+      };
+    }
 
-  // ✅ 每題切換：重置作答狀態/提示
-useEffect(() => {
-  setAnswer({ kind: "none" });
-  setShowHint(false);
-  setHintCount(0); // ✅ 換題提示次數歸零
-}, [question?.id]);
+    if (session.subject === "數學") {
+      return {
+        id: "demo-m-1",
+        subject: "數學",
+        type: "single",
+        prompt: "(示範) 小明有 12 顆糖，平均分給 3 個朋友，每人可以分到幾顆？",
+        hint: "想想除法",
+        options: [
+          { id: "a", text: "3" },
+          { id: "b", text: "4", correct: true },
+          { id: "c", text: "6" },
+          { id: "d", text: "12" },
+        ],
+        tools: { whiteboard: true, abacus: true },
+      };
+    }
+
+    // 英文
+    return {
+      id: "demo-e-1",
+      subject: "英文",
+      type: "single",
+      prompt: "(示範) Which one is a fruit?",
+      hint: "想想常見水果",
+      options: [
+        { id: "a", text: "Apple", correct: true },
+        { id: "b", text: "Chair" },
+        { id: "c", text: "Book" },
+        { id: "d", text: "Shoe" },
+      ],
+      tools: { whiteboard: true, abacus: false },
+    };
+  }, [session]);
 
   if (!session) return null;
 
@@ -84,56 +129,51 @@ useEffect(() => {
     router.back();
   }
 
+  function onSelect(id: string) {
+    if (submitted) return;
+    setSelectedId(id);
+  }
+
+  function submitAnswer() {
+    if (!selectedId || submitted) return;
+    setSubmitted(true);
+
+    const picked = question.options.find((o) => o.id === selectedId);
+    const ok = !!picked?.correct;
+    if (ok) setCorrectCount((n) => n + 1);
+    else setWrongCount((n) => n + 1);
+  }
+
   function nextQuestion() {
-    // ✅ 先做 demo：只是把題號 +1（未來會真的換題）
+    // 這裡先用「假下一題」：題號 +1、清掉作答狀態
     const next = { ...session, currentIndex: session.currentIndex + 1, paused: false };
     saveSession(next);
     setSession(next);
+
+    setSelectedId(null);
+    setSubmitted(false);
+    setShowHint(false);
+    // hintUsed 保留（同一次作答最多 3 次）
   }
 
-  function endAndBackToHub() {
-    // ✅ 結束回學習區（你要保留進度就不 clear，現在先保留）
-    router.replace("/practice");
+  function useHint() {
+    if (hintUsed >= 3) return;
+    setHintUsed((n) => n + 1);
+    setShowHint(true);
   }
 
-  function canSubmit(q: Question, a: AnswerState) {
-    if (q.type === "choice") return a.kind === "choice";
-    if (q.type === "fill") return a.kind === "fill" && a.text.trim().length > 0;
-    return a.kind === "application" && a.text.trim().length > 0;
-  }
-
-  function submit(q: Question) {
-    if (!canSubmit(q, answer)) return;
-
-    // ✅ 先做 demo 判題（之後會改成題庫評分）
-    let isCorrect = false;
-
-    if (q.type === "choice" && answer.kind === "choice") {
-      isCorrect = answer.selectedId === q.answerId;
-    } else if (q.type === "fill" && answer.kind === "fill") {
-      isCorrect = answer.text.trim() === q.answerText.trim();
-    } else if (q.type === "application" && answer.kind === "application") {
-      // 應用題先不嚴格判斷：只要有填就算已提交（先走流程）
-      isCorrect = true;
-    }
-
-    if (isCorrect) setCorrectCount((c) => c + 1);
-    else setWrongCount((w) => w + 1);
-
-    // ✅ 提交後自動下一題（你之後可以改成「顯示解析→下一題」）
-    nextQuestion();
-  }
+  const hintLabel = `提示（3/${Math.min(hintUsed + 1, 3)}）`;
+  const hintStatus = `提示次數：3/${hintUsed}`;
 
   return (
     <main style={ui.wrap}>
-      <h1 style={{ margin: "0 0 12px", fontSize: 34, fontWeight: 900 }}>
+      <h1 style={{ margin: "0 0 12px", fontSize: 28, fontWeight: 900 }}>
         作答中（{session.subject}）
       </h1>
 
-      {/* A. 狀態區（固定） */}
-      <section style={ui.card}>
+      {/* 狀態卡 */}
+      <div style={ui.card}>
         <h2 style={ui.cardTitle}>狀態</h2>
-
         <p style={ui.cardDesc}>
           科目：{session.subject}
           <br />
@@ -142,204 +182,102 @@ useEffect(() => {
           計時：{formatTime(session.elapsedSec)}
           <br />
           狀態：{session.paused ? "已暫停" : "進行中"}
+          <br />
+          對：{correctCount} / 錯：{wrongCount}
+          <br />
+          {hintStatus}
         </p>
-
-        {/* ✅ 對/錯統計建議放在「狀態卡」底部，一眼看得到 */}
-        <div style={{ marginTop: 10, display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <span style={{ ...ui.navBtn, opacity: 0.9 }}>對：{correctCount}</span>
-          <span style={{ ...ui.navBtn, opacity: 0.9 }}>錯：{wrongCount}</span>
-        </div>
 
         <div style={{ marginTop: 14, display: "flex", gap: 12, flexWrap: "wrap" }}>
           <button onClick={togglePause} style={{ ...ui.navBtn, cursor: "pointer" }}>
             {session.paused ? "▶ 繼續" : "⏸ 暫停"}
           </button>
 
+          <button
+            onClick={useHint}
+            disabled={hintUsed >= 3}
+            style={{
+              ...ui.navBtn,
+              cursor: hintUsed >= 3 ? "not-allowed" : "pointer",
+              opacity: hintUsed >= 3 ? 0.5 : 1,
+            }}
+          >
+            {hintLabel}
+          </button>
+
+          <button
+            onClick={submitAnswer}
+            disabled={!selectedId || submitted || session.paused}
+            style={{
+              ...ui.navBtn,
+              cursor: !selectedId || submitted || session.paused ? "not-allowed" : "pointer",
+              opacity: !selectedId || submitted || session.paused ? 0.5 : 1,
+            }}
+          >
+            提交答案
+          </button>
+
+          <button
+            onClick={nextQuestion}
+            disabled={!submitted}
+            style={{
+              ...ui.navBtn,
+              cursor: !submitted ? "not-allowed" : "pointer",
+              opacity: !submitted ? 0.5 : 1,
+            }}
+          >
+            下一題 →
+          </button>
+
           <button onClick={back} style={{ ...ui.navBtn, cursor: "pointer" }}>
             ← 回上一頁
           </button>
         </div>
-      </section>
-
-      {/* B. 題目區（依題型變化） */}
-      <section style={{ ...ui.card, marginTop: 16 }}>
-        <h2 style={ui.cardTitle}>題目</h2>
-
-        {!question ? (
-          <p style={ui.cardDesc}>題目載入中…</p>
-        ) : (
-          <>
-            <p style={{ ...ui.cardDesc, marginTop: 10 }}>
-              {question.prompt}
-              <br />
-              <span style={{ opacity: 0.7 }}>
-                工具：
-                {question.tools?.whiteboard ? " 白板開" : " 白板關"} /
-                {question.tools?.abacus ? " 算盤開" : " 算盤關"}
-              </span>
-            </p>
-
-            {/* ✅ 提示：放在題目區「題幹下方」，不占狀態卡空間 */}
-            <div style={{ marginTop: 10, display: "flex", gap: 12, flexWrap: "<button
-  onClick={() => {
-    if (hintCount >= 3) return;
-    setShowHint(true);
-    setHintCount((c) => c + 1);
-  }}
-  disabled={hintCount >= 3}
-  style={{
-    ...ui.navBtn,
-    cursor: hintCount >= 3 ? "not-allowed" : "pointer",
-    opacity: hintCount >= 3 ? 0.5 : 1,
-  }}
->
-  提示（3/{hintCount})
-</button>
-            </div>
-
-            {showHint && question.hint ? (
-              <div style={{ marginTop: 10, ...ui.navBtn, opacity: 0.9 }}>
-                提示：{question.hint}
-              </div>
-            ) : null}
-
-            {/* ✅ 作答區：依題型渲染 */}
-            <div style={{ marginTop: 14 }}>
-              <AnswerArea question={question} answer={answer} setAnswer={setAnswer} paused={!!session.paused} />
-            </div>
-
-            {/* ✅ 操作列：建議放在作答區下方（拇指區） */}
-            <div style={{ marginTop: 14, display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <button
-                onClick={() => submit(question)}
-                disabled={!canSubmit(question, answer) || !!session.paused}
-                style={{
-                  ...ui.navBtn,
-                  cursor: !canSubmit(question, answer) || !!session.paused ? "not-allowed" : "pointer",
-                  opacity: !canSubmit(question, answer) || !!session.paused ? 0.5 : 1,
-                }}
-              >
-                提交答案
-              </button>
-
-              <button
-                onClick={nextQuestion}
-                disabled={!!session.paused}
-                style={{
-                  ...ui.navBtn,
-                  cursor: !!session.paused ? "not-allowed" : "pointer",
-                  opacity: !!session.paused ? 0.5 : 1,
-                }}
-              >
-                下一題 →
-              </button>
-
-              <button
-                onClick={endAndBackToHub}
-                style={{ ...ui.navBtn, cursor: "pointer" }}
-              >
-                結束並回學習區
-              </button>
-            </div>
-          </>
-        )}
-      </section>
-    </main>
-  );
-}
-
-function AnswerArea(props: {
-  question: Question;
-  answer: AnswerState;
-  setAnswer: (a: AnswerState) => void;
-  paused: boolean;
-}) {
-  const { question: q, answer, setAnswer, paused } = props;
-
-  // ✅ 共用：暫停時不可操作
-  const disabledStyle = paused ? { opacity: 0.6, pointerEvents: "none" as const } : undefined;
-
-  if (q.type === "choice") {
-    const selectedId = answer.kind === "choice" ? answer.selectedId : "";
-
-    return (
-      <div style={{ display: "grid", gap: 10, ...(disabledStyle || {}) }}>
-        {q.options.map((op) => {
-          const selected = selectedId === op.id;
-          return (
-            <button
-              key={op.id}
-              onClick={() => setAnswer({ kind: "choice", selectedId: op.id })}
-              style={{
-                ...ui.navBtn,
-                cursor: "pointer",
-                textAlign: "left",
-                fontWeight: selected ? 900 : 600,
-                borderColor: selected ? "rgba(29,78,216,0.6)" : "rgba(0,0,0,0.15)",
-              }}
-            >
-              {op.text}
-              {selected ? " ✓" : ""}
-            </button>
-          );
-        })}
       </div>
-    );
-  }
 
-  if (q.type === "fill") {
-    const text = answer.kind === "fill" ? answer.text : "";
+      {/* 題目卡 */}
+      <div style={{ ...ui.card, marginTop: 16 }}>
+        <h2 style={ui.cardTitle}>題目</h2>
+        <p style={ui.cardDesc}>{question.prompt}</p>
 
-    return (
-      <div style={{ ...(disabledStyle || {}) }}>
-        <div style={{ ...ui.navBtn, padding: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>請輸入答案</div>
-          <input
-            value={text}
-            onChange={(e) => setAnswer({ kind: "fill", text: e.target.value })}
-            placeholder="在這裡輸入…"
-            style={{
-              width: "100%",
-              padding: 12,
-              borderRadius: 12,
-              border: "1px solid rgba(0,0,0,0.15)",
-              fontSize: 16,
-            }}
-          />
+        {showHint && (
+          <div style={{ ...ui.card, marginTop: 12, background: "#fff" as any }}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 800 }}>提示</h3>
+            <p style={{ margin: 0, opacity: 0.85, lineHeight: 1.7 }}>{question.hint}</p>
+          </div>
+        )}
+
+        <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+          {question.options.map((opt) => {
+            const isPicked = selectedId === opt.id;
+            const isCorrect = submitted && opt.correct;
+            const isWrongPicked = submitted && isPicked && !opt.correct;
+
+            return (
+              <button
+                key={opt.id}
+                onClick={() => onSelect(opt.id)}
+                disabled={session.paused}
+                style={{
+                  ...ui.card,
+                  cursor: session.paused ? "not-allowed" : "pointer",
+                  textAlign: "left",
+                  outline: isPicked ? "2px solid rgba(29,78,216,0.6)" : "none",
+                  background: isCorrect ? "rgba(34,197,94,0.12)" : isWrongPicked ? "rgba(239,68,68,0.10)" : "white",
+                }}
+              >
+                <div style={{ fontWeight: 800, fontSize: 18 }}>{opt.text}</div>
+                {submitted && isCorrect && <div style={{ marginTop: 6, opacity: 0.8 }}>✅ 正確答案</div>}
+                {submitted && isWrongPicked && <div style={{ marginTop: 6, opacity: 0.8 }}>❌ 你選錯了</div>}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ marginTop: 14, opacity: 0.6, lineHeight: 1.7 }}>
+          ※ 白板 / 算盤：下一步會用「工具列」方式做成可開關的面板（先把題目與操作流程打通）。
         </div>
       </div>
-    );
-  }
-
-  // application
-  const text = answer.kind === "application" ? answer.text : "";
-
-  return (
-    <div style={{ ...(disabledStyle || {}) }}>
-      <div style={{ ...ui.navBtn, padding: 12 }}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>請寫下你的解題過程/答案</div>
-        <textarea
-          value={text}
-          onChange={(e) => setAnswer({ kind: "application", text: e.target.value })}
-          placeholder="例如：12 ÷ 3 = 4…"
-          rows={4}
-          style={{
-            width: "100%",
-            padding: 12,
-            borderRadius: 12,
-            border: "1px solid rgba(0,0,0,0.15)",
-            fontSize: 16,
-            lineHeight: 1.6,
-            resize: "vertical",
-          }}
-        />
-      </div>
-
-      {/* 先預留：白板/算盤入口（下一步才真的做） */}
-      <div style={{ marginTop: 10, display: "flex", gap: 12, flexWrap: "wrap", opacity: 0.85 }}>
-        {q.tools?.whiteboard ? <span style={ui.navBtn}>白板（下一步接）</span> : null}
-        {q.tools?.abacus ? <span style={ui.navBtn}>算盤（下一步接）</span> : null}
-      </div>
-    </div>
+    </main>
   );
 }
