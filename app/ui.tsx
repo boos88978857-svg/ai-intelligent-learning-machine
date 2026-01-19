@@ -74,6 +74,18 @@ export const ui = {
     fontWeight: 800,
   } as CSSProperties,
 
+  backLink: {
+    display: "inline-block",
+    marginTop: 16,
+    color: "#1d4ed8",
+    textDecoration: "underline",
+    fontWeight: 800,
+    background: "transparent",
+    border: "none",
+    padding: 0,
+    cursor: "pointer",
+  } as CSSProperties,
+
   // 小膠囊（狀態用）
   pill: {
     padding: "10px 14px",
