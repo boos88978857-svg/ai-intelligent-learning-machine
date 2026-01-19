@@ -80,4 +80,13 @@ export const ui = {
     gridTemplateColumns: "1fr 1fr",
     gap: 16,
   } as CSSProperties,
+
+  pill: {
+    padding: "10px 14px",
+    borderRadius: 14,
+    border: "1.5px solid #ddd",
+    background: "#fff",
+    fontWeight: 800,
+    whiteSpace: "nowrap",
+  } as CSSProperties,
 };
