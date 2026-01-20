@@ -1,8 +1,7 @@
 // app/ui.tsx
-import { CSSProperties } from "react";
+import type { CSSProperties } from "react";
 
 export const ui = {
-  /* ===== 全站容器 ===== */
   page: {
     minHeight: "100vh",
     background: "#fafafa",
@@ -14,7 +13,6 @@ export const ui = {
     padding: "16px 16px 40px",
   } as CSSProperties,
 
-  /* ===== 导航列 ===== */
   navBar: {
     display: "flex",
     gap: 12,
@@ -23,11 +21,11 @@ export const ui = {
   } as CSSProperties,
 
   navBtn: {
-    padding: "8px 14px",
+    padding: "10px 16px",
     borderRadius: 14,
     border: "1.5px solid #ddd",
     background: "#fff",
-    fontWeight: 700,
+    fontWeight: 800,
     cursor: "pointer",
   } as CSSProperties,
 
@@ -37,7 +35,6 @@ export const ui = {
     borderColor: "#111",
   } as CSSProperties,
 
-  /* ===== 卡片 ===== */
   card: {
     background: "#fff",
     border: "1.5px solid #e5e5e5",
@@ -46,50 +43,46 @@ export const ui = {
   } as CSSProperties,
 
   cardTitle: {
-    margin: "0 0 10px",
+    margin: 0,
     fontSize: 22,
     fontWeight: 900,
   } as CSSProperties,
 
   cardDesc: {
-    margin: 0,
-    color: "#333",
+    margin: "8px 0 0",
     lineHeight: 1.6,
+    color: "#333",
+    fontWeight: 600,
   } as CSSProperties,
 
-  /* ===== 栅格 ===== */
   grid2: {
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gridTemplateColumns: "1fr 1fr",
     gap: 14,
   } as CSSProperties,
 
-  /* ===== 链接/按钮辅助 ===== */
+  pill: {
+    padding: "10px 14px",
+    borderRadius: 14,
+    border: "1.5px solid #ddd",
+    background: "#fff",
+    fontWeight: 900,
+    whiteSpace: "nowrap",
+  } as CSSProperties,
+
   smallLink: {
     fontSize: 14,
     color: "#555",
     textDecoration: "underline",
+    cursor: "pointer",
+    fontWeight: 700,
   } as CSSProperties,
 
   backLink: {
-    marginTop: 14,
-    display: "inline-block",
-    color: "#1d4ed8",
+    fontSize: 16,
+    color: "#1b4fff",
     textDecoration: "underline",
-    fontWeight: 700,
-    background: "transparent",
-    border: "none",
-    padding: 0,
     cursor: "pointer",
-  } as CSSProperties,
-
-  /* ===== 小胶囊（状态栏用） ===== */
-  pill: {
-    padding: "10px 12px",
-    borderRadius: 14,
-    border: "1.5px solid #ddd",
-    background: "#fff",
     fontWeight: 800,
-    whiteSpace: "nowrap",
   } as CSSProperties,
 };
