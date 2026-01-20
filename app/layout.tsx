@@ -1,21 +1,16 @@
-import "./globals.css";
+// app/layout.tsx
+import type { ReactNode } from "react";
 import Nav from "./nav";
+import { ui } from "./ui";
 
-export const metadata = {
-  title: "AI 智能學習機",
-  description: "AI 智能學習機 - 框架入口",
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="zh-Hant">
-      <body>
-        <Nav />
-        {children}
+      <body style={ui.page}>
+        <div style={ui.wrap}>
+          <Nav />
+          {children}
+        </div>
       </body>
     </html>
   );
