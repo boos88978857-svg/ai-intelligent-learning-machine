@@ -1,30 +1,13 @@
 // app/practice/page.tsx
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
 import { ui } from "../ui";
-import { clearSession, loadAllSessions } from "../lib/session";
-
-type AnySession = {
-  subject: string;
-  currentIndex: number;
-  totalQuestions: number;
-  elapsedSec: number;
-  paused: boolean;
-  correctCount?: number;
-  wrongCount?: number;
-  hintUsed?: number;
-};
-
-function formatTime(sec: number) {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-}
+import { clearSession, loadAllSessions, PracticeSession } from "../lib/session";
 
 export default function PracticeHubPage() {
-  const [sessions, setSessions] = useState<Record<string, AnySession>>({});
+  const [sessions, setSessions] = useState<PracticeSession[]>([]);
 
   function refresh() {
     setSessions(loadAllSessions());
@@ -32,87 +15,66 @@ export default function PracticeHubPage() {
 
   useEffect(() => {
     refresh();
-    // 讓你從別頁回來也會更新（同一個分頁）
-    const onFocus = () => refresh();
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
   }, []);
-
-  const subjects = useMemo(() => {
-    const keys = Object.keys(sessions || {});
-    // 你想固定排序也可以改這裡
-    return keys.sort();
-  }, [sessions]);
-
-  function onClear(subject: string) {
-    clearSession(subject);
-    refresh();
-  }
 
   return (
     <main style={ui.wrap}>
-      <h1 style={{ margin: "0 0 10px", fontSize: 34, fontWeight: 900 }}>學習區</h1>
-      <p style={{ margin: "0 0 18px", opacity: 0.75, lineHeight: 1.7 }}>
-        這裡只負責「續做中心」：顯示你有哪些科目做到一半，可以繼續或清除。
-      </p>
+      <h1 style={{ margin: "0 0 12px", fontSize: 34, fontWeight: 900 }}>學習區</h1>
 
-      {subjects.length === 0 ? (
+      <div style={ui.card}>
+        <p style={ui.cardDesc}>
+          這裡只負責顯示「做到一半」的科目，讓你續做或清除。
+          <br />
+          開始新回合請回到各科入口（英文 / 數學）選擇階段後開始。
+        </p>
+      </div>
+
+      <div style={{ height: 14 }} />
+
+      {sessions.length === 0 ? (
         <div style={ui.card}>
-          <h2 style={ui.cardTitle}>目前沒有續做</h2>
-          <p style={ui.cardDesc}>請先到各科入口開始練習，做到一半就會出現在這裡。</p>
-          <div style={{ marginTop: 12, display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <Link href="/" style={ui.navBtn}>
-              回首頁
-            </Link>
-            <Link href="/english" style={ui.navBtn}>
-              去英文專區
-            </Link>
-            <Link href="/math" style={ui.navBtn}>
-              去數學專區
-            </Link>
-          </div>
+          <h2 style={ui.cardTitle}>目前沒有未完成的練習</h2>
+          <p style={ui.cardDesc}>去英文或數學入口開始後，這裡就會出現續做項目。</p>
         </div>
       ) : (
-        <div style={ui.grid2}>
-          {subjects.map((subject) => {
-            const s = sessions[subject];
-            if (!s) return null;
+        <div style={{ display: "grid", gap: 12 }}>
+          {sessions.map((s) => (
+            <div key={s.id} style={ui.card}>
+              <h2 style={ui.cardTitle}>{s.subject}（未完成）</h2>
+              <p style={ui.cardDesc}>
+                進度：第 {s.currentIndex + 1} 題 / {s.totalQuestions}
+                <br />
+                對：{s.correctCount}　錯：{s.wrongCount}
+                <br />
+                提示：{s.hintUsed}/{s.hintLimit}
+              </p>
 
-            const correct = s.correctCount ?? 0;
-            const wrong = s.wrongCount ?? 0;
-            const hintUsed = s.hintUsed ?? 0;
+              <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <Link href="/practice/session" style={{ ...ui.navBtn, textDecoration: "none" }}>
+                  續做
+                </Link>
 
-            return (
-              <div key={subject} style={ui.card}>
-                <h2 style={ui.cardTitle}>{subject}（續做）</h2>
-                <p style={ui.cardDesc}>
-                  進度：第 {s.currentIndex + 1} 題 / {s.totalQuestions}
-                  <br />
-                  計時：{formatTime(s.elapsedSec)}
-                  <br />
-                  狀態：{s.paused ? "已暫停" : "進行中"}
-                  <br />
-                  對：{correct}　錯：{wrong}　提示：{hintUsed}
-                </p>
-
-                <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <Link href={`/practice/session?subject=${encodeURIComponent(subject)}`} style={ui.navBtn}>
-                    繼續
-                  </Link>
-
-                  <button
-                    type="button"
-                    onClick={() => onClear(subject)}
-                    style={{ ...ui.navBtn, cursor: "pointer" }}
-                  >
-                    清除
-                  </button>
-                </div>
+                <button
+                  style={ui.navBtn}
+                  onClick={() => {
+                    clearSession(s.subject);
+                    refresh();
+                  }}
+                >
+                  清除
+                </button>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
+
+      <button
+        onClick={() => history.back()}
+        style={{ ...ui.backLink, marginTop: 18 }}
+      >
+        ← 回上一頁
+      </button>
     </main>
   );
 }
