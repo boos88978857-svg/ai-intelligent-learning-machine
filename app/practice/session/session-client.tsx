@@ -4,7 +4,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ui } from "../../ui";
-import { loadSession, saveSession, PracticeSession, clearSession } from "../../lib/session";
+import {
+  PracticeSession,
+  getSession,
+  upsertSession,
+  removeSession,
+  setActiveSessionId,
+  getActiveSessionId,
+} from "../../lib/session";
 
 type Question = {
   id: string;
@@ -20,7 +27,7 @@ function formatTime(sec: number) {
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-/** 測試題庫（示範用） */
+/** 測試題庫（示範用，之後改為你自建題庫） */
 const mockQuestions: Question[] = [
   {
     id: "en-1",
@@ -58,70 +65,71 @@ const mockQuestions: Question[] = [
     ],
     hints: ["想想除法", "3 個人平均分", "每人拿一樣多", "12 是被分的數", "答案不是 3"],
   },
+  {
+    id: "other-1",
+    subject: "其他",
+    prompt: "(示範) 其他科目入口已打通：這題只是示範。",
+    choices: [
+      { id: "a", text: "選項 A", correct: true },
+      { id: "b", text: "選項 B" },
+      { id: "c", text: "選項 C" },
+      { id: "d", text: "選項 D" },
+    ],
+    hints: ["這是示範提示 1", "這是示範提示 2", "這是示範提示 3", "這是示範提示 4", "這是示範提示 5"],
+  },
 ];
-
-const TOTAL_PER_ROUND = 20;
-const HINT_LIMIT = 5;
 
 export default function PracticeSessionClient() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const subjectFromQuery = useMemo(() => searchParams.get("subject"), [searchParams]);
+  const sp = useSearchParams();
+
+  // ✅ 優先使用 ?id= ，沒有才用 activeId（避免你直接輸入網址時找不到）
+  const sessionId = useMemo(() => {
+    return sp.get("id") ?? getActiveSessionId();
+  }, [sp]);
 
   const [session, setSession] = useState<PracticeSession | null>(null);
 
-  // 題目互動狀態（每題會重置）
+  // 每題互動狀態
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [hintText, setHintText] = useState<string | null>(null);
 
-  // 載入續做資料
+  // 讀取回合
   useEffect(() => {
-    const s = loadSession();
+    if (!sessionId) {
+      router.replace("/practice");
+      return;
+    }
+    const s = getSession(sessionId);
     if (!s) {
       router.replace("/practice");
       return;
     }
+    setActiveSessionId(s.id);
+    setSession(s);
+  }, [router, sessionId]);
 
-    // ✅ 確保 session 內有我們需要的欄位（舊資料向下相容）
-    const patched: PracticeSession = {
-      ...s,
-      totalQuestions: (s as any).totalQuestions ?? TOTAL_PER_ROUND,
-      hintLimit: (s as any).hintLimit ?? HINT_LIMIT,
-      correctCount: (s as any).correctCount ?? 0,
-      wrongCount: (s as any).wrongCount ?? 0,
-      hintsUsed: (s as any).hintsUsed ?? 0,
-      roundDone: (s as any).roundDone ?? false,
-    } as any;
+  function persist(next: PracticeSession) {
+    upsertSession(next);
+    setSession(next);
+  }
 
-    // 可選：subject 由 query 覆蓋（你之後做多回合時會用到）
-    if (subjectFromQuery && patched.subject !== (subjectFromQuery as any)) {
-      const next = { ...patched, subject: subjectFromQuery as any };
-      saveSession(next);
-      setSession(next);
-      return;
-    }
-
-    // 寫回修補後版本
-    saveSession(patched);
-    setSession(patched);
-  }, [router, subjectFromQuery]);
-
-  // 計時（暫停就停；回合完成也停）
+  // 計時（暫停/完成就停）
   useEffect(() => {
     if (!session || session.paused || session.roundDone) return;
 
-    const timer = setInterval(() => {
+    const t = setInterval(() => {
       setSession((prev) => {
         if (!prev || prev.paused || prev.roundDone) return prev;
         const next = { ...prev, elapsedSec: prev.elapsedSec + 1 };
-        saveSession(next);
+        upsertSession(next);
         return next;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => clearInterval(t);
   }, [session]);
 
   const currentQuestion = useMemo(() => {
@@ -134,43 +142,36 @@ export default function PracticeSessionClient() {
 
   if (!session || !currentQuestion) return null;
 
-  const currentNo = session.currentIndex + 1;
-  const shownNo = Math.min(currentNo, session.totalQuestions ?? TOTAL_PER_ROUND);
-  const totalQ = session.totalQuestions ?? TOTAL_PER_ROUND;
-  const hintLimit = session.hintLimit ?? HINT_LIMIT;
+  const totalQ = session.totalQuestions;
+  const hintLimit = session.hintLimit;
 
-  const correctCount = session.correctCount ?? 0;
-  const wrongCount = session.wrongCount ?? 0;
-  const hintsUsed = session.hintsUsed ?? 0;
+  const correctCount = session.correctCount;
+  const wrongCount = session.wrongCount;
+  const hintsUsed = session.hintsUsed;
+
+  const currentNo = session.currentIndex + 1;
+  const shownNo = Math.min(currentNo, totalQ);
   const hintsLeft = Math.max(0, hintLimit - hintsUsed);
 
-  function persist(next: PracticeSession) {
-    saveSession(next);
-    setSession(next);
-  }
+  const pillStyle: React.CSSProperties = { ...ui.pill, whiteSpace: "nowrap" };
 
   function togglePause() {
     const next = { ...session, paused: !session.paused };
     persist(next);
-
     if (next.paused) setMessage("已暫停。請點上方「▶ 繼續」後再操作。");
     else setMessage(null);
   }
 
-  function back() {
-    router.back();
-  }
-
-  function selectChoice(choiceId: string) {
+  function selectChoice(id: string) {
     if (session.paused || session.roundDone) return;
-    if (hasSubmitted) return; // 提交後不允許改選
-    setSelectedChoiceId(choiceId);
+    if (hasSubmitted) return;
+    setSelectedChoiceId(id);
     setMessage(null);
   }
 
   function submit() {
     if (session.paused || session.roundDone) return;
-    if (hasSubmitted) return; // ✅ 防重複計分
+    if (hasSubmitted) return;
 
     if (!selectedChoiceId) {
       setMessage("請先選擇一個答案。");
@@ -210,8 +211,7 @@ export default function PracticeSessionClient() {
 
     const next = { ...session, hintsUsed: hintsUsed + 1 };
     persist(next);
-
-    setHintText(text); // 覆蓋前一次提示
+    setHintText(text);
   }
 
   function nextQuestion() {
@@ -226,9 +226,9 @@ export default function PracticeSessionClient() {
       return;
     }
 
-    // ✅ 回合結束
+    // ✅ 20 題完成：只標記完成，不刪資料
     if (currentNo >= totalQ) {
-      const next = { ...session, roundDone: true };
+      const next = { ...session, roundDone: true, paused: false };
       persist(next);
       setMessage(null);
       return;
@@ -237,24 +237,22 @@ export default function PracticeSessionClient() {
     const next = { ...session, currentIndex: session.currentIndex + 1 };
     persist(next);
 
-    // 重置本題狀態
     setSelectedChoiceId(null);
     setHasSubmitted(false);
     setMessage(null);
     setHintText(null);
   }
 
-  function finishRoundGoPractice() {
-    // 先清掉本回合續做（你要保留已完成紀錄也可以改成只標記完成不清）
-    clearSession();
+  function goPractice() {
     router.replace("/practice");
   }
 
-  const pillStyle: React.CSSProperties = {
-    ...ui.pill,
-    whiteSpace: "nowrap",
-  };
+  function deleteThisSession() {
+    removeSession(session.id);
+    router.replace("/practice");
+  }
 
+  // ✅ 回合完成畫面
   if (session.roundDone) {
     return (
       <main style={ui.wrap}>
@@ -275,11 +273,11 @@ export default function PracticeSessionClient() {
           </p>
 
           <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button onClick={finishRoundGoPractice} style={{ ...ui.navBtn, cursor: "pointer" }}>
+            <button onClick={goPractice} style={{ ...ui.navBtn, cursor: "pointer" }}>
               回學習區
             </button>
-            <button onClick={() => router.replace("/")} style={{ ...ui.navBtn, cursor: "pointer" }}>
-              回首頁
+            <button onClick={deleteThisSession} style={{ ...ui.navBtn, cursor: "pointer" }}>
+              刪除此回合
             </button>
           </div>
         </div>
@@ -305,8 +303,11 @@ export default function PracticeSessionClient() {
           <button onClick={togglePause} style={{ ...ui.navBtn, cursor: "pointer" }}>
             {session.paused ? "▶ 繼續" : "⏸ 暫停"}
           </button>
-          <button onClick={back} style={{ ...ui.navBtn, cursor: "pointer" }}>
+          <button onClick={() => router.back()} style={{ ...ui.navBtn, cursor: "pointer" }}>
             ← 回上一頁
+          </button>
+          <button onClick={goPractice} style={{ ...ui.navBtn, cursor: "pointer" }}>
+            回學習區
           </button>
         </div>
 
