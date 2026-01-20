@@ -5,17 +5,14 @@ export type PracticeSession = {
   id: string;
   subject: Subject;
 
-  // 回合設定
-  totalQuestions: number; // 預設 20
-  hintLimit: number; // 預設 5
+  totalQuestions: number; // 每回合題數（預設 20）
+  hintLimit: number; // 每回合提示上限（預設 5）
 
-  // 進度
   currentIndex: number; // 0-based
   correctCount: number;
   wrongCount: number;
   hintsUsed: number;
 
-  // 狀態
   paused: boolean;
   elapsedSec: number;
   roundDone: boolean;
@@ -23,8 +20,8 @@ export type PracticeSession = {
   updatedAt: number; // timestamp
 };
 
-const SESSIONS_KEY = "ai_learning_sessions_v1";
-const ACTIVE_ID_KEY = "ai_learning_active_session_id_v1";
+const SESSIONS_KEY = "ai_learning_sessions_v2"; // ✅ 新 key，避免跟舊資料互相污染
+const ACTIVE_ID_KEY = "ai_learning_active_session_id_v2";
 
 function safeParse<T>(raw: string | null): T | null {
   if (!raw) return null;
@@ -36,36 +33,44 @@ function safeParse<T>(raw: string | null): T | null {
 }
 
 function genId() {
-  // iOS/Safari/Chrome 都可用；若不行就 fallback
+  // iOS/Safari/Chrome 皆可
   // @ts-ignore
-  return (globalThis.crypto?.randomUUID?.() ?? `s_${Date.now()}_${Math.random().toString(16).slice(2)}`);
+  return globalThis.crypto?.randomUUID?.() ?? `s_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+/** ========== 多回合：讀寫整包 ========== */
+function loadMap(): Record<string, PracticeSession> {
+  if (typeof window === "undefined") return {};
+  return safeParse<Record<string, PracticeSession>>(localStorage.getItem(SESSIONS_KEY)) ?? {};
+}
+
+function saveMap(map: Record<string, PracticeSession>) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(SESSIONS_KEY, JSON.stringify(map));
 }
 
 export function loadAllSessions(): PracticeSession[] {
-  if (typeof window === "undefined") return [];
-  const map = safeParse<Record<string, PracticeSession>>(localStorage.getItem(SESSIONS_KEY)) ?? {};
-  return Object.values(map).sort((a, b) => b.updatedAt - a.updatedAt);
+  const map = loadMap();
+  return Object.values(map).sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 }
 
 export function getSession(id: string): PracticeSession | null {
-  if (typeof window === "undefined") return null;
-  const map = safeParse<Record<string, PracticeSession>>(localStorage.getItem(SESSIONS_KEY)) ?? {};
+  const map = loadMap();
   return map[id] ?? null;
 }
 
 export function upsertSession(s: PracticeSession) {
-  if (typeof window === "undefined") return;
-  const map = safeParse<Record<string, PracticeSession>>(localStorage.getItem(SESSIONS_KEY)) ?? {};
+  const map = loadMap();
   map[s.id] = { ...s, updatedAt: Date.now() };
-  localStorage.setItem(SESSIONS_KEY, JSON.stringify(map));
+  saveMap(map);
 }
 
 export function removeSession(id: string) {
-  if (typeof window === "undefined") return;
-  const map = safeParse<Record<string, PracticeSession>>(localStorage.getItem(SESSIONS_KEY)) ?? {};
+  const map = loadMap();
   delete map[id];
-  localStorage.setItem(SESSIONS_KEY, JSON.stringify(map));
+  saveMap(map);
 
+  // 如果刪掉的是 active，就清掉 active
   const active = getActiveSessionId();
   if (active === id) setActiveSessionId(null);
 }
@@ -76,6 +81,7 @@ export function clearAllSessions() {
   localStorage.removeItem(ACTIVE_ID_KEY);
 }
 
+/** ========== Active Session（目前作答中的回合） ========== */
 export function getActiveSessionId(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(ACTIVE_ID_KEY);
@@ -93,6 +99,7 @@ export function getActiveSession(): PracticeSession | null {
   return getSession(id);
 }
 
+/** ========== 建立新回合 ========== */
 export function newSession(subject: Subject): PracticeSession {
   return {
     id: genId(),
@@ -110,16 +117,20 @@ export function newSession(subject: Subject): PracticeSession {
   };
 }
 
-/** =========================
- * 相容舊 API（避免你其他頁面還在呼叫舊名字造成紅燈）
- * 之後你穩定了再慢慢刪掉也行
- * ========================= */
+/** ========== 舊 API 相容（讓你現有頁面先不壞） ========== */
+/** 讀取目前 active 的回合 */
 export function loadSession(): PracticeSession | null {
   return getActiveSession();
 }
+
+/** 儲存目前 active 的回合（或指定 id 的回合） */
 export function saveSession(s: PracticeSession) {
   upsertSession(s);
+  // 確保 active 指向它
+  setActiveSessionId(s.id);
 }
+
+/** 清除目前 active 的回合 */
 export function clearSession() {
   const id = getActiveSessionId();
   if (id) removeSession(id);
