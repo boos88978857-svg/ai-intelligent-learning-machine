@@ -1,24 +1,17 @@
-// app/practice/session/session-client.tsx
+// app/practice/session/[id]/session-client.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ui } from "../../ui";
-import {
-  PracticeSession,
-  getSession,
-  upsertSession,
-  removeSession,
-  setActiveSessionId,
-  getActiveSessionId,
-} from "../../lib/session";
+import { ui } from "../../../ui";
+import { getSession, upsertSession, PracticeSession } from "../../../lib/session";
 
+type Choice = { id: string; text: string; correct?: boolean };
 type Question = {
   id: string;
-  subject: PracticeSession["subject"];
   prompt: string;
-  choices: { id: string; text: string; correct?: boolean }[];
-  hints: string[];
+  hints: string[]; // 可扩展多段提示
+  choices: Choice[];
 };
 
 function formatTime(sec: number) {
@@ -27,382 +20,319 @@ function formatTime(sec: number) {
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-/** 測試題庫（示範用，之後改為你自建題庫） */
-const mockQuestions: Question[] = [
-  {
-    id: "en-1",
-    subject: "英文",
-    prompt: "(示範) Which one is a fruit?",
+function buildMockQuestion(subject: string, index: number): Question {
+  // 这里只是示范题（你问 Apple/Blue 为何一样：是因为现在是 demo）
+  if (subject === "英文") {
+    return {
+      id: `en-${index + 1}`,
+      prompt: "Which one is a fruit?",
+      hints: ["想想常見水果。", "常見水果：apple、banana、orange。", "排除非水果的物品。"],
+      choices: [
+        { id: "a", text: "Apple", correct: true },
+        { id: "b", text: "Chair" },
+        { id: "c", text: "Book" },
+        { id: "d", text: "Shoe" },
+      ],
+    };
+  }
+  if (subject === "數學") {
+    return {
+      id: `ma-${index + 1}`,
+      prompt: "小明有 12 顆糖，平均分給 3 個朋友，每人可以分到幾顆？",
+      hints: ["想想除法。", "12 ÷ 3 = ?", "平均分就是除法。"],
+      choices: [
+        { id: "a", text: "3" },
+        { id: "b", text: "4", correct: true },
+        { id: "c", text: "5" },
+        { id: "d", text: "6" },
+      ],
+    };
+  }
+  return {
+    id: `ot-${index + 1}`,
+    prompt: "（示範）太陽從哪裡升起？",
+    hints: ["想想方位。", "太陽從東邊升起。", "答案是東方。"],
     choices: [
-      { id: "a", text: "Apple", correct: true },
-      { id: "b", text: "Chair" },
-      { id: "c", text: "Book" },
-      { id: "d", text: "Shoe" },
+      { id: "a", text: "東方", correct: true },
+      { id: "b", text: "西方" },
+      { id: "c", text: "南方" },
+      { id: "d", text: "北方" },
     ],
-    hints: ["想想常見水果", "它可以吃", "你可能在早餐看到它", "常見於果汁", "它不是家具"],
-  },
-  {
-    id: "en-2",
-    subject: "英文",
-    prompt: "(示範) Which one is a color?",
-    choices: [
-      { id: "a", text: "Blue", correct: true },
-      { id: "b", text: "Dog" },
-      { id: "c", text: "Table" },
-      { id: "d", text: "Milk" },
-    ],
-    hints: ["想想顏色", "天空常見", "也常拿來形容心情", "不是動物", "不是食物"],
-  },
-  {
-    id: "math-1",
-    subject: "數學",
-    prompt: "(示範) 12 ÷ 3 = ?",
-    choices: [
-      { id: "a", text: "3" },
-      { id: "b", text: "4", correct: true },
-      { id: "c", text: "6" },
-      { id: "d", text: "9" },
-    ],
-    hints: ["想想除法", "3 個人平均分", "每人拿一樣多", "12 是被分的數", "答案不是 3"],
-  },
-  {
-    id: "other-1",
-    subject: "其他",
-    prompt: "(示範) 其他科目入口已打通：這題只是示範。",
-    choices: [
-      { id: "a", text: "選項 A", correct: true },
-      { id: "b", text: "選項 B" },
-      { id: "c", text: "選項 C" },
-      { id: "d", text: "選項 D" },
-    ],
-    hints: ["這是示範提示 1", "這是示範提示 2", "這是示範提示 3", "這是示範提示 4", "這是示範提示 5"],
-  },
-];
+  };
+}
 
-export default function PracticeSessionClient({ id }: { id: string | null }) {
+export default function SessionClient({ sessionId }: { sessionId: string }) {
   const router = useRouter();
-
-  // ✅ 優先使用 props 的 id，沒有才 fallback activeId
-  const sessionId = useMemo(() => {
-    return id ?? getActiveSessionId();
-  }, [id]);
-
   const [session, setSession] = useState<PracticeSession | null>(null);
 
-  // 每題互動狀態
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [hintText, setHintText] = useState<string | null>(null);
 
-  // 讀取回合
+  const [message, setMessage] = useState<string>("");
+  const [hintText, setHintText] = useState<string>(""); // 当前提示卡内容
+  const [hintIndexShown, setHintIndexShown] = useState<number>(0); // 已显示第几个提示（1..n）
+
+  const currentQuestion = useMemo(() => {
+    if (!session) return null;
+    return buildMockQuestion(session.subject, session.currentIndex);
+  }, [session]);
+
+  // 读 session
   useEffect(() => {
-    if (!sessionId) {
-      router.replace("/practice");
-      return;
-    }
     const s = getSession(sessionId);
     if (!s) {
       router.replace("/practice");
       return;
     }
-    setActiveSessionId(s.id);
     setSession(s);
   }, [router, sessionId]);
 
-  function persist(next: PracticeSession) {
-    upsertSession(next);
-    setSession(next);
-  }
-
-  // 計時（暫停/完成就停）
+  // 计时
   useEffect(() => {
-    if (!session || session.paused || session.roundDone) return;
-
-    const t = setInterval(() => {
+    if (!session || session.paused || session.status !== "in_progress") return;
+    const timer = setInterval(() => {
       setSession((prev) => {
-        if (!prev || prev.paused || prev.roundDone) return prev;
+        if (!prev) return prev;
         const next = { ...prev, elapsedSec: prev.elapsedSec + 1 };
         upsertSession(next);
         return next;
       });
     }, 1000);
-
-    return () => clearInterval(t);
-  }, [session]);
-
-  const currentQuestion = useMemo(() => {
-    if (!session) return null;
-    const pool = mockQuestions.filter((q) => q.subject === session.subject);
-    const list = pool.length ? pool : mockQuestions;
-    const idx = session.currentIndex % list.length;
-    return list[idx];
+    return () => clearInterval(timer);
   }, [session]);
 
   if (!session || !currentQuestion) return null;
 
-  const totalQ = session.totalQuestions;
-  const hintLimit = session.hintLimit;
+  const paused = session.paused;
 
-  const correctCount = session.correctCount;
-  const wrongCount = session.wrongCount;
-  const hintsUsed = session.hintsUsed;
-
-  const currentNo = session.currentIndex + 1;
-  const shownNo = Math.min(currentNo, totalQ);
-  const hintsLeft = Math.max(0, hintLimit - hintsUsed);
-
-  const pillStyle: React.CSSProperties = { ...ui.pill, whiteSpace: "nowrap" };
-
-  function togglePause() {
-    const next = { ...session, paused: !session.paused };
-    persist(next);
-    if (next.paused) setMessage("已暫停。請點上方「▶ 繼續」後再操作。");
-    else setMessage(null);
+  function persist(next: PracticeSession) {
+    setSession(next);
+    upsertSession(next);
   }
 
-  function selectChoice(cid: string) {
-    if (session.paused || session.roundDone) return;
+  function togglePause() {
+    persist({ ...session, paused: !session.paused });
+  }
+
+  function pick(choiceId: string) {
+    if (paused) return;
     if (hasSubmitted) return;
-    setSelectedChoiceId(cid);
-    setMessage(null);
+    setSelectedChoiceId(choiceId);
+    setMessage("");
+  }
+
+  function useHint() {
+    if (paused) return;
+    if (hasSubmitted && isCurrentCorrect()) return; // 已答对就不需要提示
+    if (session.hintUsed >= session.hintLimit) {
+      setMessage("提示次數已用完。");
+      return;
+    }
+
+    // 扣次数
+    const nextSession = { ...session, hintUsed: session.hintUsed + 1 };
+    persist(nextSession);
+
+    // 显示下一条提示（覆盖上一条）
+    const nextIndex = Math.min(hintIndexShown + 1, currentQuestion.hints.length);
+    setHintIndexShown(nextIndex);
+    setHintText(currentQuestion.hints[nextIndex - 1] || currentQuestion.hints[0]);
+    setMessage("");
+  }
+
+  function isCurrentCorrect() {
+    if (!selectedChoiceId) return false;
+    const picked = currentQuestion.choices.find((c) => c.id === selectedChoiceId);
+    return !!picked?.correct;
   }
 
   function submit() {
-    if (session.paused || session.roundDone) return;
-    if (hasSubmitted) return;
+    if (paused) return;
 
     if (!selectedChoiceId) {
       setMessage("請先選擇一個答案。");
       return;
     }
 
-    const picked = currentQuestion.choices.find((c) => c.id === selectedChoiceId);
-    const isCorrect = !!picked?.correct;
-
+    const correct = isCurrentCorrect();
     setHasSubmitted(true);
 
-    if (isCorrect) {
-      persist({ ...session, correctCount: correctCount + 1 });
+    if (correct) {
+      // ✅ 答对：加正确数、提示卡在进入下一题时消失
+      const next = { ...session, correctCount: session.correctCount + 1 };
+      persist(next);
       setMessage("答對了！請繼續下一題。");
-      setHintText(null);
+      // 让文字“停留久一点”再进下一题
+      setTimeout(() => {
+        goNextAfterCorrect(next);
+      }, 900);
     } else {
-      persist({ ...session, wrongCount: wrongCount + 1 });
+      // ✅ 答错：不跳题
+      const next = { ...session, wrongCount: session.wrongCount + 1 };
+      persist(next);
       setMessage("很可惜，這題沒有答對。你可以再試一次或使用提示。");
     }
   }
 
-  function useHint() {
-    if (session.paused || session.roundDone) return;
-
-    if (hintsLeft <= 0) {
-      setHintText(`提示已用完（本回合上限 ${hintLimit} 次）。`);
-      return;
-    }
-
-    const idx = hintsUsed;
-    const text =
-      currentQuestion.hints[idx] ??
-      currentQuestion.hints[currentQuestion.hints.length - 1] ??
-      "（暫無提示）";
-
-    persist({ ...session, hintsUsed: hintsUsed + 1 });
-    setHintText(text);
-  }
-
-  function nextQuestion() {
-    if (session.paused || session.roundDone) return;
-
-    if (!selectedChoiceId) {
-      setMessage("請先選擇一個答案。");
-      return;
-    }
-    if (!hasSubmitted) {
-      setMessage("請先提交答案。");
-      return;
-    }
-
-    if (currentNo >= totalQ) {
-      persist({ ...session, roundDone: true, paused: false });
-      setMessage(null);
-      return;
-    }
-
-    persist({ ...session, currentIndex: session.currentIndex + 1 });
-
+  function goNextAfterCorrect(s: PracticeSession) {
+    // 清理本题状态
     setSelectedChoiceId(null);
     setHasSubmitted(false);
-    setMessage(null);
-    setHintText(null);
+    setMessage("");
+    setHintText(""); // ✅ 答对进入下一题，提示卡自动消失
+    setHintIndexShown(0);
+
+    const nextIndex = s.currentIndex + 1;
+
+    // ✅ 回合结束：20题就结束
+    if (nextIndex >= s.totalQuestions) {
+      const done = { ...s, status: "done", currentIndex: s.totalQuestions - 1 };
+      upsertSession(done);
+      router.replace(`/practice/summary/${done.id}`);
+      return;
+    }
+
+    const next = { ...s, currentIndex: nextIndex };
+    persist(next);
   }
 
-  function goPractice() {
-    router.replace("/practice");
-  }
+  // ❌ 下一题按钮：必须答对后才可点
+  const nextDisabled = paused || !hasSubmitted || !isCurrentCorrect();
 
-  function deleteThisSession() {
-    removeSession(session.id);
-    router.replace("/practice");
-  }
-
-  if (session.roundDone) {
-    return (
-      <main style={ui.wrap}>
-        <h1 style={{ margin: "0 0 12px", fontSize: 28, fontWeight: 900 }}>回合完成 ✅</h1>
-
-        <div style={ui.card}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>統計</h2>
-          <p style={{ margin: "10px 0 0", opacity: 0.8, lineHeight: 1.7 }}>
-            科目：{session.subject}
-            <br />
-            題數：{totalQ}
-            <br />
-            對：{correctCount}　錯：{wrongCount}
-            <br />
-            提示：{hintLimit}/{hintsUsed}
-            <br />
-            總用時：{formatTime(session.elapsedSec)}
-          </p>
-
-          <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button onClick={goPractice} style={{ ...ui.navBtn, cursor: "pointer" }}>
-              回學習區
-            </button>
-            <button onClick={deleteThisSession} style={{ ...ui.navBtn, cursor: "pointer" }}>
-              刪除此回合
-            </button>
-          </div>
-        </div>
-      </main>
-    );
+  // 样式：选择/对/错
+  function choiceStyle(c: Choice) {
+    let base = ui.choiceCard;
+    if (selectedChoiceId === c.id) base = { ...base, ...ui.choiceSelected };
+    if (hasSubmitted) {
+      if (c.correct) base = { ...base, ...ui.choiceCorrect };
+      if (selectedChoiceId === c.id && !c.correct) base = { ...base, ...ui.choiceWrong };
+    }
+    return base;
   }
 
   return (
-    <main style={ui.wrap}>
-      <h1 style={{ margin: "0 0 10px", fontSize: 28, fontWeight: 900 }}>作答中</h1>
+    <main>
+      <h1 style={{ margin: "0 0 12px", fontSize: 40, fontWeight: 900 }}>
+        作答中
+      </h1>
 
+      {/* 状态区（固定同一行，不要跑版） */}
       <div style={ui.card}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-          <div style={pillStyle}>科目：{session.subject}</div>
-          <div style={pillStyle}>
-            第 {shownNo} / {totalQ}
+        <div style={ui.pillRow}>
+          <div style={ui.pill}>科目：{session.subject}</div>
+          <div style={ui.pill}>
+            第 {session.currentIndex + 1} 題 / {session.totalQuestions}
           </div>
-          <div style={pillStyle}>⏱ {formatTime(session.elapsedSec)}</div>
+          <div style={ui.pill}>⏱ {formatTime(session.elapsedSec)}</div>
         </div>
 
-        <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button onClick={togglePause} style={{ ...ui.navBtn, cursor: "pointer" }}>
-            {session.paused ? "▶ 繼續" : "⏸ 暫停"}
+        <div style={ui.btnRow}>
+          <button style={ui.btn} onClick={togglePause}>
+            {paused ? "▶ 繼續" : "⏸ 暫停"}
           </button>
-          <button onClick={() => router.back()} style={{ ...ui.navBtn, cursor: "pointer" }}>
+          <button
+            style={ui.btn}
+            onClick={() => router.back()}
+          >
             ← 回上一頁
           </button>
-          <button onClick={goPractice} style={{ ...ui.navBtn, cursor: "pointer" }}>
-            回學習區
-          </button>
         </div>
 
-        {session.paused && (
-          <div style={{ ...ui.card, marginTop: 12, background: "#fff" }}>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>提醒</h3>
-            <p style={{ margin: "8px 0 0", opacity: 0.8, lineHeight: 1.7 }}>
-              已暫停。請點上方「▶ 繼續」後再操作。
-            </p>
+        {/* 暂停提醒卡：只有“点了暂停”才出现 */}
+        {paused ? (
+          <div style={ui.notice}>
+            <p style={ui.noticeTitle}>提醒</p>
+            <p style={ui.noticeText}>已暫停。請點上方「▶ 繼續」後再操作。</p>
           </div>
-        )}
+        ) : null}
       </div>
 
-      <div style={{ ...ui.card, marginTop: 12 }}>
+      {/* 题目区（尽量保持一页） */}
+      <div style={{ ...ui.card, marginTop: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>題目</h2>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <div style={{ ...pillStyle, padding: "8px 12px" }}>對 {correctCount}</div>
-            <div style={{ ...pillStyle, padding: "8px 12px" }}>錯 {wrongCount}</div>
-            <div style={{ ...pillStyle, padding: "8px 12px" }}>
-              提示 {hintLimit}/{hintsUsed}
-            </div>
+          <h2 style={{ ...ui.cardTitle, margin: 0 }}>題目</h2>
+          {/* ✅ 右侧放对/错/提示，不显示多余“提示: 5/0”在标题区 */}
+          <div style={ui.pillRow}>
+            <div style={ui.pill}>對 {session.correctCount}</div>
+            <div style={ui.pill}>錯 {session.wrongCount}</div>
+            <div style={ui.pill}>提示 {session.hintUsed}/{session.hintLimit}</div>
           </div>
         </div>
 
-        <p style={{ margin: "10px 0 12px", lineHeight: 1.7 }}>{currentQuestion.prompt}</p>
+        <p style={{ ...ui.cardDesc, marginTop: 10 }}>
+          （示範） {currentQuestion.prompt}
+        </p>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          {currentQuestion.choices.map((c) => {
-            const active = selectedChoiceId === c.id;
-            return (
-              <button
-                key={c.id}
-                onClick={() => selectChoice(c.id)}
-                disabled={session.paused}
-                style={{
-                  ...ui.card,
-                  cursor: session.paused ? "not-allowed" : "pointer",
-                  textAlign: "left",
-                  border: active ? "2px solid rgba(29,78,216,0.55)" : (ui.card as any).border,
-                  background: active ? "rgba(29,78,216,0.06)" : "white",
-                  opacity: session.paused ? 0.6 : 1,
-                }}
-              >
-                <div style={{ fontSize: 20, fontWeight: 900 }}>{c.text}</div>
-              </button>
-            );
-          })}
+        {/* 选项 */}
+        <div style={ui.choiceGrid}>
+          {currentQuestion.choices.map((c) => (
+            <div
+              key={c.id}
+              style={{
+                ...choiceStyle(c),
+                ...(paused ? { opacity: 0.55, cursor: "not-allowed" } : {}),
+              }}
+              onClick={() => pick(c.id)}
+            >
+              {c.text}
+            </div>
+          ))}
         </div>
 
-        <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {/* 操作列 */}
+        <div style={ui.btnRow}>
           <button
-            onClick={useHint}
-            disabled={session.paused}
             style={{
-              ...ui.navBtn,
-              cursor: session.paused ? "not-allowed" : "pointer",
-              opacity: session.paused ? 0.6 : 1,
+              ...ui.btn,
+              ...(paused || session.hintUsed >= session.hintLimit ? ui.btnDisabled : {}),
             }}
+            onClick={useHint}
+            disabled={paused || session.hintUsed >= session.hintLimit}
           >
-            💡 提示（{hintLimit}/{hintsUsed}）
+            💡 提示（{session.hintUsed}/{session.hintLimit}）
           </button>
 
           <button
-            onClick={submit}
-            disabled={session.paused || hasSubmitted}
             style={{
-              ...ui.navBtn,
-              cursor: session.paused || hasSubmitted ? "not-allowed" : "pointer",
-              opacity: session.paused || hasSubmitted ? 0.6 : 1,
+              ...ui.btn,
+              ...ui.btnPrimary,
+              ...(paused ? ui.btnDisabled : {}),
             }}
+            onClick={submit}
+            disabled={paused}
           >
             ✅ 提交答案
           </button>
 
           <button
-            onClick={nextQuestion}
-            disabled={session.paused || !hasSubmitted}
             style={{
-              ...ui.navBtn,
-              cursor: session.paused || !hasSubmitted ? "not-allowed" : "pointer",
-              opacity: session.paused || !hasSubmitted ? 0.6 : 1,
+              ...ui.btn,
+              ...(nextDisabled ? ui.btnDisabled : {}),
             }}
+            onClick={() => goNextAfterCorrect(session)}
+            disabled={nextDisabled}
           >
             下一題 →
           </button>
         </div>
 
-        {hintText && (
-          <div style={{ ...ui.card, marginTop: 12, background: "#fff" }}>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>
-              提示（{hintLimit}/{hintsUsed}）
-            </h3>
-            <p style={{ margin: "8px 0 0", opacity: 0.8, lineHeight: 1.7 }}>{hintText}</p>
+        {/* 提示卡：点提示后停留到答对进入下一题才消失；再次点提示会覆盖内容 */}
+        {hintText ? (
+          <div style={ui.notice}>
+            <p style={ui.noticeTitle}>訊息</p>
+            <p style={ui.noticeText}>
+              （提示 {hintIndexShown}/{currentQuestion.hints.length}）{hintText}
+            </p>
           </div>
-        )}
+        ) : null}
 
-        {message && (
-          <div style={{ ...ui.card, marginTop: 12, background: "#fff" }}>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>訊息</h3>
-            <p style={{ margin: "8px 0 0", opacity: 0.8, lineHeight: 1.7 }}>{message}</p>
+        {/* 反馈卡 */}
+        {message ? (
+          <div style={ui.notice}>
+            <p style={ui.noticeTitle}>訊息</p>
+            <p style={ui.noticeText}>{message}</p>
           </div>
-        )}
+        ) : null}
       </div>
     </main>
   );
