@@ -1,5 +1,5 @@
 // app/ui.ts
-import type { CSSProperties } from "react";
+import { CSSProperties } from "react";
 
 export const ui = {
   page: {
@@ -10,53 +10,54 @@ export const ui = {
   wrap: {
     maxWidth: 960,
     margin: "0 auto",
-    padding: "16px 16px 44px",
+    padding: "16px 16px 40px",
   } as CSSProperties,
 
   navBar: {
     display: "flex",
-    gap: 10,
+    gap: 12,
     flexWrap: "wrap",
     marginBottom: 18,
   } as CSSProperties,
 
   navBtn: {
-    padding: "8px 14px",
-    borderRadius: 14,
+    padding: "10px 16px",
+    borderRadius: 16,
     border: "1.5px solid #ddd",
     background: "#fff",
-    fontWeight: 700,
+    fontWeight: 800,
     cursor: "pointer",
   } as CSSProperties,
 
   navBtnActive: {
-    borderColor: "#2f5cff",
-    color: "#2f5cff",
+    background: "#111",
+    color: "#fff",
+    borderColor: "#111",
   } as CSSProperties,
 
   card: {
     background: "#fff",
-    border: "1.5px solid #e5e5e5",
+    border: "1.5px solid #e6e6e6",
     borderRadius: 18,
     padding: 16,
-    boxShadow: "0 1px 0 rgba(0,0,0,0.02)",
   } as CSSProperties,
 
   cardTitle: {
-    margin: 0,
-    fontSize: 22,
+    margin: "0 0 10px",
+    fontSize: 18,
     fontWeight: 900,
   } as CSSProperties,
 
   cardDesc: {
-    margin: "10px 0 0",
+    margin: 0,
     lineHeight: 1.6,
-    color: "#333",
+    opacity: 0.85,
+    fontSize: 15,
   } as CSSProperties,
 
   grid2: {
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gridTemplateColumns: "1fr 1fr",
     gap: 12,
   } as CSSProperties,
 
@@ -64,92 +65,62 @@ export const ui = {
     display: "flex",
     gap: 10,
     flexWrap: "wrap",
+    alignItems: "center",
   } as CSSProperties,
 
   pill: {
     padding: "10px 14px",
-    borderRadius: 14,
-    border: "1.5px solid #ddd",
+    borderRadius: 16,
+    border: "1.5px solid #e5e5e5",
     background: "#fff",
-    fontWeight: 800,
+    fontWeight: 900,
     whiteSpace: "nowrap",
   } as CSSProperties,
 
-  btnRow: {
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-    marginTop: 14,
-  } as CSSProperties,
-
-  btn: {
-    padding: "10px 14px",
-    borderRadius: 14,
-    border: "1.5px solid #ddd",
-    background: "#fff",
-    fontWeight: 800,
-    cursor: "pointer",
-  } as CSSProperties,
-
-  btnPrimary: {
-    borderColor: "#18a34a",
-  } as CSSProperties,
-
-  btnDisabled: {
-    opacity: 0.5,
-    cursor: "not-allowed",
-  } as CSSProperties,
-
-  choiceGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: 12,
-    marginTop: 14,
-  } as CSSProperties,
-
-  choiceCard: {
+  choiceBtn: {
+    width: "100%",
+    textAlign: "left",
+    padding: "14px 14px",
     borderRadius: 16,
-    border: "1.5px solid #ddd",
+    border: "1.5px solid #e5e5e5",
     background: "#fff",
-    padding: 14,
     fontWeight: 900,
     fontSize: 20,
     cursor: "pointer",
-    userSelect: "none",
   } as CSSProperties,
 
-  choiceSelected: {
-    borderColor: "#2f5cff",
-    background: "#eef3ff",
+  choiceBtnSelected: {
+    borderColor: "#245bff",
+    boxShadow: "0 0 0 2px rgba(36,91,255,0.18) inset",
+    background: "#f3f6ff",
   } as CSSProperties,
 
-  choiceCorrect: {
-    borderColor: "#18a34a",
-    background: "#ecfdf3",
+  choiceBtnDisabled: {
+    opacity: 0.55,
+    cursor: "not-allowed",
   } as CSSProperties,
 
-  choiceWrong: {
-    borderColor: "#ef4444",
-    background: "#fff1f2",
-  } as CSSProperties,
-
-  notice: {
+  actionRow: {
     marginTop: 14,
+    display: "flex",
+    gap: 12,
+    flexWrap: "wrap",
+  } as CSSProperties,
+
+  primaryBtn: {
+    padding: "12px 16px",
     borderRadius: 16,
     border: "1.5px solid #ddd",
     background: "#fff",
-    padding: 14,
-  } as CSSProperties,
-
-  noticeTitle: {
-    margin: 0,
     fontWeight: 900,
-    fontSize: 18,
+    cursor: "pointer",
   } as CSSProperties,
 
-  noticeText: {
-    margin: "8px 0 0",
-    lineHeight: 1.6,
-    color: "#333",
+  msgCard: {
+    marginTop: 14,
+    background: "#fff",
+    border: "1.5px solid #e6e6e6",
+    borderRadius: 18,
+    padding: 16,
   } as CSSProperties,
-};
+} as const;
