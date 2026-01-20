@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ui } from "../../ui";
 import {
   PracticeSession,
@@ -79,14 +79,13 @@ const mockQuestions: Question[] = [
   },
 ];
 
-export default function PracticeSessionClient() {
+export default function PracticeSessionClient({ id }: { id: string | null }) {
   const router = useRouter();
-  const sp = useSearchParams();
 
-  // ✅ 優先使用 ?id= ，沒有才用 activeId（避免你直接輸入網址時找不到）
+  // ✅ 優先使用 props 的 id，沒有才 fallback activeId
   const sessionId = useMemo(() => {
-    return sp.get("id") ?? getActiveSessionId();
-  }, [sp]);
+    return id ?? getActiveSessionId();
+  }, [id]);
 
   const [session, setSession] = useState<PracticeSession | null>(null);
 
@@ -162,10 +161,10 @@ export default function PracticeSessionClient() {
     else setMessage(null);
   }
 
-  function selectChoice(id: string) {
+  function selectChoice(cid: string) {
     if (session.paused || session.roundDone) return;
     if (hasSubmitted) return;
-    setSelectedChoiceId(id);
+    setSelectedChoiceId(cid);
     setMessage(null);
   }
 
@@ -184,13 +183,11 @@ export default function PracticeSessionClient() {
     setHasSubmitted(true);
 
     if (isCorrect) {
-      const next = { ...session, correctCount: correctCount + 1 };
-      persist(next);
+      persist({ ...session, correctCount: correctCount + 1 });
       setMessage("答對了！請繼續下一題。");
       setHintText(null);
     } else {
-      const next = { ...session, wrongCount: wrongCount + 1 };
-      persist(next);
+      persist({ ...session, wrongCount: wrongCount + 1 });
       setMessage("很可惜，這題沒有答對。你可以再試一次或使用提示。");
     }
   }
@@ -203,14 +200,13 @@ export default function PracticeSessionClient() {
       return;
     }
 
-    const idx = hintsUsed; // 0-based
+    const idx = hintsUsed;
     const text =
       currentQuestion.hints[idx] ??
       currentQuestion.hints[currentQuestion.hints.length - 1] ??
       "（暫無提示）";
 
-    const next = { ...session, hintsUsed: hintsUsed + 1 };
-    persist(next);
+    persist({ ...session, hintsUsed: hintsUsed + 1 });
     setHintText(text);
   }
 
@@ -226,16 +222,13 @@ export default function PracticeSessionClient() {
       return;
     }
 
-    // ✅ 20 題完成：只標記完成，不刪資料
     if (currentNo >= totalQ) {
-      const next = { ...session, roundDone: true, paused: false };
-      persist(next);
+      persist({ ...session, roundDone: true, paused: false });
       setMessage(null);
       return;
     }
 
-    const next = { ...session, currentIndex: session.currentIndex + 1 };
-    persist(next);
+    persist({ ...session, currentIndex: session.currentIndex + 1 });
 
     setSelectedChoiceId(null);
     setHasSubmitted(false);
@@ -252,7 +245,6 @@ export default function PracticeSessionClient() {
     router.replace("/practice");
   }
 
-  // ✅ 回合完成畫面
   if (session.roundDone) {
     return (
       <main style={ui.wrap}>
@@ -289,7 +281,6 @@ export default function PracticeSessionClient() {
     <main style={ui.wrap}>
       <h1 style={{ margin: "0 0 10px", fontSize: 28, fontWeight: 900 }}>作答中</h1>
 
-      {/* 狀態卡 */}
       <div style={ui.card}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
           <div style={pillStyle}>科目：{session.subject}</div>
@@ -321,7 +312,6 @@ export default function PracticeSessionClient() {
         )}
       </div>
 
-      {/* 題目卡 */}
       <div style={{ ...ui.card, marginTop: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>題目</h2>
