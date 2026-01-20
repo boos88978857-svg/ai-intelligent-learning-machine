@@ -1,59 +1,147 @@
 // app/lib/session.ts
+"use client";
+
 export type Subject = "英文" | "數學" | "其他";
 
-export type SessionStatus = "in_progress" | "done";
+export type QuestionType = "choice" | "application";
+
+export type Choice = {
+  id: string;
+  text: string;
+  correct?: boolean;
+};
+
+export type Question = {
+  id: string;
+  subject: Subject;
+  type: QuestionType;
+  prompt: string;
+  hint?: string;
+  choices?: Choice[]; // choice 題才需要
+};
 
 export type PracticeSession = {
   id: string;
   subject: Subject;
 
-  totalQuestions: number; // 20
-  currentIndex: number; // 0..19
-
+  totalQuestions: number; // 固定 20
+  currentIndex: number; // 0-based
   elapsedSec: number;
   paused: boolean;
 
   correctCount: number;
   wrongCount: number;
 
-  hintLimit: number; // 5
+  hintLimit: number; // 固定 5
   hintUsed: number;
 
-  status: SessionStatus;
-
-  createdAt: number;
-  updatedAt: number;
+  // 作答狀態（每題）
+  selectedChoiceId?: string;
+  hasSubmitted?: boolean;
 };
 
-const KEY = "aim:sessions:v1";
+type SessionsMap = Record<string, PracticeSession>;
 
-type Store = Record<string, PracticeSession>;
+const KEY_SESSIONS = "ilm:sessions:v1";
+const KEY_ACTIVE_BY_SUBJECT = "ilm:activeBySubject:v1";
 
-function readStore(): Store {
-  if (typeof window === "undefined") return {};
+function safeParse<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return {};
-    return JSON.parse(raw) as Store;
+    return JSON.parse(raw) as T;
   } catch {
-    return {};
+    return fallback;
   }
 }
 
-function writeStore(store: Store) {
+function nowId() {
+  // 夠用就好：時間 + 隨機
+  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+/** 讀取全部 sessions */
+export function loadAllSessions(): SessionsMap {
+  if (typeof window === "undefined") return {};
+  return safeParse<SessionsMap>(localStorage.getItem(KEY_SESSIONS), {});
+}
+
+/** 覆寫全部 sessions */
+export function saveAllSessions(map: SessionsMap) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(KEY, JSON.stringify(store));
+  localStorage.setItem(KEY_SESSIONS, JSON.stringify(map));
 }
 
-function genId() {
-  return `s_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`;
+/** 取得單一 session */
+export function getSession(sessionId: string): PracticeSession | null {
+  const all = loadAllSessions();
+  return all[sessionId] ?? null;
 }
 
-/** 建新回合（注意：这里统一 20 题 / 5 次提示） */
+/** 新增/更新 session */
+export function upsertSession(s: PracticeSession) {
+  const all = loadAllSessions();
+  all[s.id] = s;
+  saveAllSessions(all);
+}
+
+/** 移除 session */
+export function removeSession(sessionId: string) {
+  const all = loadAllSessions();
+  delete all[sessionId];
+  saveAllSessions(all);
+
+  // 同步清掉 active 指向
+  const active = loadActiveBySubject();
+  (Object.keys(active) as Subject[]).forEach((sub) => {
+    if (active[sub] === sessionId) {
+      delete active[sub];
+    }
+  });
+  saveActiveBySubject(active);
+}
+
+/** 依 subject 列出未完成 session（只要 currentIndex < totalQuestions） */
+export function listUnfinishedBySubject(subject: Subject): PracticeSession[] {
+  const all = loadAllSessions();
+  return Object.values(all).filter(
+    (s) => s.subject === subject && s.currentIndex < s.totalQuestions
+  );
+}
+
+/** 列出所有未完成 session */
+export function listAllUnfinished(): PracticeSession[] {
+  const all = loadAllSessions();
+  return Object.values(all).filter((s) => s.currentIndex < s.totalQuestions);
+}
+
+/** activeBySubject */
+type ActiveBySubject = Partial<Record<Subject, string>>;
+
+function loadActiveBySubject(): ActiveBySubject {
+  if (typeof window === "undefined") return {};
+  return safeParse<ActiveBySubject>(localStorage.getItem(KEY_ACTIVE_BY_SUBJECT), {});
+}
+
+function saveActiveBySubject(map: ActiveBySubject) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(KEY_ACTIVE_BY_SUBJECT, JSON.stringify(map));
+}
+
+export function setActiveSessionId(subject: Subject, sessionId: string) {
+  const map = loadActiveBySubject();
+  map[subject] = sessionId;
+  saveActiveBySubject(map);
+}
+
+export function getActiveSessionId(subject: Subject): string | null {
+  const map = loadActiveBySubject();
+  return map[subject] ?? null;
+}
+
+/** 建新回合（從「科目入口頁」觸發，學習區不提供新回合入口） */
 export function newSession(subject: Subject): PracticeSession {
-  const now = Date.now();
-  const s: PracticeSession = {
-    id: genId(),
+  return {
+    id: nowId(),
     subject,
     totalQuestions: 20,
     currentIndex: 0,
@@ -63,51 +151,5 @@ export function newSession(subject: Subject): PracticeSession {
     wrongCount: 0,
     hintLimit: 5,
     hintUsed: 0,
-    status: "in_progress",
-    createdAt: now,
-    updatedAt: now,
   };
-  return s;
-}
-
-/** 写入或更新 */
-export function upsertSession(s: PracticeSession) {
-  const store = readStore();
-  store[s.id] = { ...s, updatedAt: Date.now() };
-  writeStore(store);
-}
-
-/** 取得单一 session */
-export function getSession(id: string): PracticeSession | null {
-  const store = readStore();
-  return store[id] ?? null;
-}
-
-/** 删除某个 session */
-export function removeSession(id: string) {
-  const store = readStore();
-  delete store[id];
-  writeStore(store);
-}
-
-/** 列出全部（只回传未完成，学习区只负责续做） */
-export function listInProgressSessions(): PracticeSession[] {
-  const store = readStore();
-  return Object.values(store)
-    .filter((s) => s.status === "in_progress")
-    .sort((a, b) => b.updatedAt - a.updatedAt);
-}
-
-/** 方便旧代码兼容：loadSession() / loadSession(subject) */
-export function loadSession(): PracticeSession | null;
-export function loadSession(subject: Subject): PracticeSession | null;
-export function loadSession(subject?: Subject): PracticeSession | null {
-  const list = listInProgressSessions();
-  if (!subject) return list[0] ?? null;
-  return list.find((s) => s.subject === subject) ?? null;
-}
-
-/** 清空全部续做（可选按钮用） */
-export function clearAllSessions() {
-  writeStore({});
 }
