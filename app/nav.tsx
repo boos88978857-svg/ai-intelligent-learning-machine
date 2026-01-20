@@ -1,3 +1,4 @@
+// app/nav.tsx
 "use client";
 
 import Link from "next/link";
@@ -7,16 +8,15 @@ import { ui } from "./ui";
 const items = [
   { href: "/", label: "首頁" },
   { href: "/practice", label: "學習區" },
-  { href: "/records", label: "記錄" },
+  { href: "/record", label: "記錄" },
   { href: "/settings", label: "設定" },
   { href: "/about", label: "關於" },
 ];
 
 export default function Nav() {
   const pathname = usePathname();
-
   return (
-    <nav style={ui.navBar}>
+    <div style={ui.navBar}>
       {items.map((it) => {
         const active = pathname === it.href;
         return (
@@ -25,13 +25,15 @@ export default function Nav() {
             href={it.href}
             style={{
               ...ui.navBtn,
-              borderColor: active ? "rgba(29,78,216,0.6)" : "rgba(0,0,0,0.15)",
+              ...(active ? ui.navBtnActive : {}),
+              textDecoration: "none",
+              display: "inline-block",
             }}
           >
             {it.label}
           </Link>
         );
       })}
-    </nav>
+    </div>
   );
 }
