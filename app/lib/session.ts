@@ -1,95 +1,107 @@
 // app/lib/session.ts
-export type Subject = "英文" | "數學" | "其他學科" | "學習競技場" | string;
+export type Subject = "英文" | "數學" | "其他";
 
 export type PracticeSession = {
   id: string;
   subject: Subject;
-  totalQuestions: number;
+
+  totalQuestions: number; // 固定 20
   currentIndex: number; // 0-based
   elapsedSec: number;
+
   paused: boolean;
 
   correctCount: number;
   wrongCount: number;
 
+  hintLimit: number; // 固定 5
   hintUsed: number;
-  hintLimit: number;
 
-  // 你后续题库会替换，这里先保留扩展空间
-  meta?: Record<string, any>;
+  // 你之后接题库会用到
+  stage?: string;
+
+  createdAt: number;
+  updatedAt: number;
 };
 
-const STORAGE_KEY = "aim:sessions:v1";
+const LS_KEY = "ai_learning_sessions_v1";
 
-type SessionMap = Record<string, PracticeSession>;
+type SessionMap = Record<string, PracticeSession>; // key = subject
 
-function safeParse<T>(raw: string | null): T | null {
-  if (!raw) return null;
+function safeParse(json: string | null): SessionMap {
+  if (!json) return {};
   try {
-    return JSON.parse(raw) as T;
+    const obj = JSON.parse(json);
+    if (!obj || typeof obj !== "object") return {};
+    return obj as SessionMap;
   } catch {
-    return null;
+    return {};
   }
 }
 
-function readMap(): SessionMap {
+function readAll(): SessionMap {
   if (typeof window === "undefined") return {};
-  const map = safeParse<SessionMap>(localStorage.getItem(STORAGE_KEY));
-  return map && typeof map === "object" ? map : {};
+  return safeParse(window.localStorage.getItem(LS_KEY));
 }
 
-function writeMap(map: SessionMap) {
+function writeAll(map: SessionMap) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+  window.localStorage.setItem(LS_KEY, JSON.stringify(map));
 }
 
-/** 读全部进行中的 session（给学习区用） */
-export function loadAllSessions(): PracticeSession[] {
-  const map = readMap();
-  return Object.values(map).sort((a, b) => (a.subject > b.subject ? 1 : -1));
-}
-
-/**
- * 读某科目的 session
- * - 允许你写 loadSession("英文")
- * - 也允许旧代码不带参数：loadSession() -> 回传任意一个（优先第一个）
- */
-export function loadSession(subject?: Subject): PracticeSession | null {
-  const map = readMap();
-  if (subject) return map[String(subject)] ?? null;
-  const all = Object.values(map);
-  return all.length ? all[0] : null;
-}
-
-/** 保存/更新某科目的 session */
-export function saveSession(session: PracticeSession) {
-  const map = readMap();
-  map[String(session.subject)] = session;
-  writeMap(map);
-}
-
-/** 清除某科目的 session */
-export function clearSession(subject: Subject) {
-  const map = readMap();
-  delete map[String(subject)];
-  writeMap(map);
-}
-
-/** 建立新回合（注意：学习区不提供“新回合”，只在入口页点开始才会用到） */
-export function newSession(subject: Subject, opts?: { totalQuestions?: number; hintLimit?: number }): PracticeSession {
-  const totalQuestions = opts?.totalQuestions ?? 20;
-  const hintLimit = opts?.hintLimit ?? 5;
-
+/** 建立新回合（仍然是 “这个科目的一笔续做记录”） */
+export function newSession(subject: Subject, stage?: string): PracticeSession {
+  const now = Date.now();
   return {
-    id: `${String(subject)}-${Date.now()}`,
+    id: `${subject}-${now}`,
     subject,
-    totalQuestions,
+
+    totalQuestions: 20,
     currentIndex: 0,
     elapsedSec: 0,
+
     paused: false,
+
     correctCount: 0,
     wrongCount: 0,
+
+    hintLimit: 5,
     hintUsed: 0,
-    hintLimit,
+
+    stage,
+
+    createdAt: now,
+    updatedAt: now,
   };
+}
+
+/** 读取某科目续做 */
+export function loadSession(subject: Subject): PracticeSession | null {
+  const map = readAll();
+  return map[subject] ?? null;
+}
+
+/** 保存某科目续做（覆盖同 subject） */
+export function saveSession(session: PracticeSession) {
+  const map = readAll();
+  map[session.subject] = { ...session, updatedAt: Date.now() };
+  writeAll(map);
+}
+
+/** 删除某科目续做 */
+export function removeSession(subject: Subject) {
+  const map = readAll();
+  delete map[subject];
+  writeAll(map);
+}
+
+/** 读取全部“做到一半”的科目 */
+export function loadAllSessions(): PracticeSession[] {
+  const map = readAll();
+  return Object.values(map).sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/** 清空全部（你以后可做“重置所有续做”按钮） */
+export function clearAllSessions() {
+  writeAll({});
 }
