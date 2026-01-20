@@ -12,7 +12,7 @@ export default function OtherEntryPage() {
 
   useEffect(() => {
     // ✅ 这里要用 Subject 里定义的值："其他"
-    const s = loadSession("其他");
+    const s = loadSession("其他學科");
     setHasSession(!!s);
   }, []);
 
