@@ -19,7 +19,7 @@ export const ui = {
     display: "flex",
     gap: 12,
     flexWrap: "wrap",
-    marginBottom: 20,
+    marginBottom: 18,
   } as CSSProperties,
 
   navBtn: {
@@ -39,50 +39,53 @@ export const ui = {
 
   /* ===== 卡片 ===== */
   card: {
-    padding: "18px 18px",
     background: "#fff",
-    borderRadius: 18,
     border: "1.5px solid #e5e5e5",
+    borderRadius: 18,
+    padding: 16,
   } as CSSProperties,
 
   cardTitle: {
-    margin: "0 0 8px",
+    margin: "0 0 10px",
     fontSize: 22,
     fontWeight: 900,
   } as CSSProperties,
 
   cardDesc: {
     margin: 0,
-    opacity: 0.75,
-    lineHeight: 1.7,
+    color: "#333",
+    lineHeight: 1.6,
   } as CSSProperties,
 
-  /* ===== 辅助样式（补齐用） ===== */
+  /* ===== 栅格 ===== */
+  grid2: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 14,
+  } as CSSProperties,
+
+  /* ===== 链接/按钮辅助 ===== */
   smallLink: {
     fontSize: 14,
     color: "#555",
     textDecoration: "underline",
-    cursor: "pointer",
   } as CSSProperties,
 
   backLink: {
-    marginTop: 16,
-    fontSize: 14,
-    color: "#333",
-    cursor: "pointer",
-    background: "none",
+    marginTop: 14,
+    display: "inline-block",
+    color: "#1d4ed8",
+    textDecoration: "underline",
+    fontWeight: 700,
+    background: "transparent",
     border: "none",
     padding: 0,
+    cursor: "pointer",
   } as CSSProperties,
 
-  grid2: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 16,
-  } as CSSProperties,
-
+  /* ===== 小胶囊（状态栏用） ===== */
   pill: {
-    padding: "10px 14px",
+    padding: "10px 12px",
     borderRadius: 14,
     border: "1.5px solid #ddd",
     background: "#fff",
