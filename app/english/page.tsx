@@ -4,45 +4,43 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ui } from "../ui";
-import { loadSession } from "../lib/session";
+import { loadSession, newSession, upsertSession, Subject } from "../lib/session";
 
 export default function EnglishEntryPage() {
   const router = useRouter();
   const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
-    const s = loadSession("英文");
+    const s = loadSession("英文" as Subject);
     setHasSession(!!s);
   }, []);
 
+  function start() {
+    const s = newSession("英文");
+    upsertSession(s);
+    router.push(`/practice/session/${s.id}`);
+  }
+
   return (
-    <main style={ui.wrap}>
-      <h1 style={{ margin: "0 0 12px", fontSize: 34, fontWeight: 1000 }}>
+    <main>
+      <h1 style={{ margin: "0 0 12px", fontSize: 40, fontWeight: 900 }}>
         英文專區
       </h1>
 
       <div style={ui.card}>
-        <h2 style={ui.cardTitle}>入口</h2>
-        <p style={ui.cardDesc}>
-          现在英文会走「阶段选择 → 出题」。学习区只负责续做。
-        </p>
+        <h2 style={ui.cardTitle}>開始英文練習</h2>
+        <p style={ui.cardDesc}>進入後會開始一個回合（20題 / 提示5次）。</p>
 
-        {hasSession && (
-          <div style={{ marginTop: 10 }}>
-            <span
-              style={ui.smallLink}
-              onClick={() => router.push("/practice")}
-            >
-              有做到一半 → 去學習區續做
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div style={{ marginTop: 18 }}>
-        <span style={ui.backLink} onClick={() => router.back()}>
-          ← 回上一頁
-        </span>
+        <div style={ui.btnRow}>
+          <button style={ui.btn} onClick={start}>
+            開始
+          </button>
+          {hasSession ? (
+            <button style={ui.btn} onClick={() => router.push("/practice")}>
+              我有做到一半 → 去學習區續做
+            </button>
+          ) : null}
+        </div>
       </div>
     </main>
   );
