@@ -1,17 +1,6 @@
-// app/practice/session/page.tsx
-import { Suspense } from "react";
-import PracticeSessionClient from "./session-client";
+// app/practice/session/[id]/page.tsx
+import SessionClient from "./session-client";
 
-export default function PracticeSessionPage({
-  searchParams,
-}: {
-  searchParams?: { id?: string };
-}) {
-  const id = searchParams?.id ?? null;
-
-  return (
-    <Suspense fallback={<main style={{ padding: 16 }}>載入中…</main>}>
-      <PracticeSessionClient id={id} />
-    </Suspense>
-  );
+export default function PracticeSessionPage({ params }: { params: { id: string } }) {
+  return <SessionClient sessionId={params.id} />;
 }
