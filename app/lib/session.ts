@@ -1,27 +1,27 @@
 // app/lib/session.ts
-export type Subject = "英文" | "數學" | "其他";
+export type Subject = "英文" | "數學" | "其他學科" | "學習競技場" | string;
 
 export type PracticeSession = {
   id: string;
   subject: Subject;
-
-  totalQuestions: number; // 每回合題數（預設 20）
-  hintLimit: number; // 每回合提示上限（預設 5）
-
+  totalQuestions: number;
   currentIndex: number; // 0-based
+  elapsedSec: number;
+  paused: boolean;
+
   correctCount: number;
   wrongCount: number;
-  hintsUsed: number;
 
-  paused: boolean;
-  elapsedSec: number;
-  roundDone: boolean;
+  hintUsed: number;
+  hintLimit: number;
 
-  updatedAt: number; // timestamp
+  // 你后续题库会替换，这里先保留扩展空间
+  meta?: Record<string, any>;
 };
 
-const SESSIONS_KEY = "ai_learning_sessions_v2"; // ✅ 新 key，避免跟舊資料互相污染
-const ACTIVE_ID_KEY = "ai_learning_active_session_id_v2";
+const STORAGE_KEY = "aim:sessions:v1";
+
+type SessionMap = Record<string, PracticeSession>;
 
 function safeParse<T>(raw: string | null): T | null {
   if (!raw) return null;
@@ -32,106 +32,64 @@ function safeParse<T>(raw: string | null): T | null {
   }
 }
 
-function genId() {
-  // iOS/Safari/Chrome 皆可
-  // @ts-ignore
-  return globalThis.crypto?.randomUUID?.() ?? `s_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-}
-
-/** ========== 多回合：讀寫整包 ========== */
-function loadMap(): Record<string, PracticeSession> {
+function readMap(): SessionMap {
   if (typeof window === "undefined") return {};
-  return safeParse<Record<string, PracticeSession>>(localStorage.getItem(SESSIONS_KEY)) ?? {};
+  const map = safeParse<SessionMap>(localStorage.getItem(STORAGE_KEY));
+  return map && typeof map === "object" ? map : {};
 }
 
-function saveMap(map: Record<string, PracticeSession>) {
+function writeMap(map: SessionMap) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(SESSIONS_KEY, JSON.stringify(map));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
 }
 
+/** 读全部进行中的 session（给学习区用） */
 export function loadAllSessions(): PracticeSession[] {
-  const map = loadMap();
-  return Object.values(map).sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  const map = readMap();
+  return Object.values(map).sort((a, b) => (a.subject > b.subject ? 1 : -1));
 }
 
-export function getSession(id: string): PracticeSession | null {
-  const map = loadMap();
-  return map[id] ?? null;
+/**
+ * 读某科目的 session
+ * - 允许你写 loadSession("英文")
+ * - 也允许旧代码不带参数：loadSession() -> 回传任意一个（优先第一个）
+ */
+export function loadSession(subject?: Subject): PracticeSession | null {
+  const map = readMap();
+  if (subject) return map[String(subject)] ?? null;
+  const all = Object.values(map);
+  return all.length ? all[0] : null;
 }
 
-export function upsertSession(s: PracticeSession) {
-  const map = loadMap();
-  map[s.id] = { ...s, updatedAt: Date.now() };
-  saveMap(map);
+/** 保存/更新某科目的 session */
+export function saveSession(session: PracticeSession) {
+  const map = readMap();
+  map[String(session.subject)] = session;
+  writeMap(map);
 }
 
-export function removeSession(id: string) {
-  const map = loadMap();
-  delete map[id];
-  saveMap(map);
-
-  // 如果刪掉的是 active，就清掉 active
-  const active = getActiveSessionId();
-  if (active === id) setActiveSessionId(null);
+/** 清除某科目的 session */
+export function clearSession(subject: Subject) {
+  const map = readMap();
+  delete map[String(subject)];
+  writeMap(map);
 }
 
-export function clearAllSessions() {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(SESSIONS_KEY);
-  localStorage.removeItem(ACTIVE_ID_KEY);
-}
+/** 建立新回合（注意：学习区不提供“新回合”，只在入口页点开始才会用到） */
+export function newSession(subject: Subject, opts?: { totalQuestions?: number; hintLimit?: number }): PracticeSession {
+  const totalQuestions = opts?.totalQuestions ?? 20;
+  const hintLimit = opts?.hintLimit ?? 5;
 
-/** ========== Active Session（目前作答中的回合） ========== */
-export function getActiveSessionId(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(ACTIVE_ID_KEY);
-}
-
-export function setActiveSessionId(id: string | null) {
-  if (typeof window === "undefined") return;
-  if (!id) localStorage.removeItem(ACTIVE_ID_KEY);
-  else localStorage.setItem(ACTIVE_ID_KEY, id);
-}
-
-export function getActiveSession(): PracticeSession | null {
-  const id = getActiveSessionId();
-  if (!id) return null;
-  return getSession(id);
-}
-
-/** ========== 建立新回合 ========== */
-export function newSession(subject: Subject): PracticeSession {
   return {
-    id: genId(),
+    id: `${String(subject)}-${Date.now()}`,
     subject,
-    totalQuestions: 20,
-    hintLimit: 5,
+    totalQuestions,
     currentIndex: 0,
+    elapsedSec: 0,
+    paused: false,
     correctCount: 0,
     wrongCount: 0,
-    hintsUsed: 0,
-    paused: false,
-    elapsedSec: 0,
-    roundDone: false,
-    updatedAt: Date.now(),
+    hintUsed: 0,
+    hintLimit,
   };
-}
-
-/** ========== 舊 API 相容（讓你現有頁面先不壞） ========== */
-/** 讀取目前 active 的回合 */
-export function loadSession(): PracticeSession | null {
-  return getActiveSession();
-}
-
-/** 儲存目前 active 的回合（或指定 id 的回合） */
-export function saveSession(s: PracticeSession) {
-  upsertSession(s);
-  // 確保 active 指向它
-  setActiveSessionId(s.id);
-}
-
-/** 清除目前 active 的回合 */
-export function clearSession() {
-  const id = getActiveSessionId();
-  if (id) removeSession(id);
 }
