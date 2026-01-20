@@ -1,70 +1,103 @@
 // app/english/page.tsx
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ui } from "../ui";
-import { newSession, upsertSession, setActiveSessionId } from "../lib/session";
+import { loadAllSessions } from "../lib/session";
 
-const levels = [
-  { id: "A1", title: "A1" },
-  { id: "A2", title: "A2" },
-  { id: "B1", title: "B1" },
-  { id: "B2", title: "B2" },
-  { id: "C1", title: "C1" },
-  { id: "C2", title: "C2" },
-  { id: "TOEIC", title: "多益" },
-] as const;
+type SimpleSession = {
+  subject: string;
+  currentIndex: number;
+  totalQuestions: number;
+  elapsedSec: number;
+  paused: boolean;
+};
+
+function formatTime(sec: number) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
 
 export default function EnglishPage() {
-  const router = useRouter();
+  const [hasResume, setHasResume] = useState(false);
+  const [resumeInfo, setResumeInfo] = useState<SimpleSession | null>(null);
 
-  function goLearn(level: string) {
-    router.push(`/english/learn?level=${encodeURIComponent(level)}`);
-  }
-
-  function startPractice(level: string) {
-    const s = newSession("英文");
-    // 先用 url 帶 level，下一步我們會把 level 存進 session 結構（避免只靠 url）
-    upsertSession(s);
-    setActiveSessionId(s.id);
-    router.push(`/practice/session?id=${encodeURIComponent(s.id)}&level=${encodeURIComponent(level)}`);
-  }
+  useEffect(() => {
+    // 只看英文是否有續做
+    const all = loadAllSessions();
+    const s = all["英文"];
+    if (s) {
+      setHasResume(true);
+      setResumeInfo({
+        subject: s.subject,
+        currentIndex: s.currentIndex,
+        totalQuestions: s.totalQuestions,
+        elapsedSec: s.elapsedSec,
+        paused: s.paused,
+      });
+    } else {
+      setHasResume(false);
+      setResumeInfo(null);
+    }
+  }, []);
 
   return (
     <main style={ui.wrap}>
-      <h1 style={{ margin: "0 0 10px", fontSize: 34, fontWeight: 900 }}>
-        英文專區
-      </h1>
-
-      <p style={{ margin: "0 0 14px", opacity: 0.75, lineHeight: 1.7 }}>
-        請先選擇階段，再進入「學習」或「練習」。練習會建立可中斷續做的回合。
+      <h1 style={{ margin: "0 0 10px", fontSize: 34, fontWeight: 900 }}>英文專區</h1>
+      <p style={{ margin: "0 0 18px", opacity: 0.75, lineHeight: 1.7 }}>
+        這裡是英文的入口頁。之後會再細分 A1–C2、TOEIC 等模組。
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        {levels.map((lv) => (
-          <div key={lv.id} style={ui.card}>
-            <h2 style={{ ...ui.cardTitle, marginBottom: 8 }}>{lv.title}</h2>
-            <p style={{ ...ui.cardDesc, margin: "0 0 12px" }}>
-              進入學習內容或開始練習（20 題 / 5 次提示）
-            </p>
+      {/* 入口卡 */}
+      <div style={ui.grid2}>
+        {/* 學習 */}
+        <Link href="/english/learn?level=A1" style={ui.card}>
+          <h2 style={ui.cardTitle}>學習</h2>
+          <p style={ui.cardDesc}>單字 / 音標偏好 / 發音（入口先打通）</p>
+          <div style={{ marginTop: 10, opacity: 0.7 }}>進入 →</div>
+        </Link>
 
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button
-                onClick={() => goLearn(lv.id)}
-                style={{ ...ui.navBtn, cursor: "pointer" }}
-              >
-                📘 學習
-              </button>
+        {/* 練習（建立新回合） */}
+        <Link href="/practice?subject=英文" style={ui.card}>
+          <h2 style={ui.cardTitle}>練習</h2>
+          <p style={ui.cardDesc}>開始新的練習回合（20 題 / 5 次提示）</p>
+          <div style={{ marginTop: 10, opacity: 0.7 }}>開始 →</div>
+        </Link>
 
-              <button
-                onClick={() => startPractice(lv.id)}
-                style={{ ...ui.navBtn, cursor: "pointer" }}
-              >
-                ✅ 練習
-              </button>
-            </div>
-          </div>
-        ))}
+        {/* 續做 */}
+        <Link
+          href={hasResume ? "/practice/session?subject=英文" : "#"}
+          style={{
+            ...ui.card,
+            opacity: hasResume ? 1 : 0.45,
+            pointerEvents: hasResume ? "auto" : "none",
+          }}
+        >
+          <h2 style={ui.cardTitle}>續做</h2>
+          <p style={ui.cardDesc}>
+            {hasResume && resumeInfo ? (
+              <>
+                進度：第 {resumeInfo.currentIndex + 1} 題 / {resumeInfo.totalQuestions}
+                <br />
+                計時：{formatTime(resumeInfo.elapsedSec)}
+                <br />
+                狀態：{resumeInfo.paused ? "已暫停" : "進行中"}
+              </>
+            ) : (
+              "目前沒有做到一半的英文練習"
+            )}
+          </p>
+          <div style={{ marginTop: 10, opacity: 0.7 }}>{hasResume ? "繼續 →" : "尚無 →"}</div>
+        </Link>
+
+        {/* 回首頁 */}
+        <Link href="/" style={ui.card}>
+          <h2 style={ui.cardTitle}>回首頁</h2>
+          <p style={ui.cardDesc}>回到四大入口</p>
+          <div style={{ marginTop: 10, opacity: 0.7 }}>返回 →</div>
+        </Link>
       </div>
     </main>
   );
