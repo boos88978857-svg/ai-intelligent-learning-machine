@@ -1,4 +1,4 @@
-// app/ui.tsx
+// app/ui.ts
 import type { CSSProperties } from "react";
 
 export const ui = {
@@ -10,29 +10,28 @@ export const ui = {
   wrap: {
     maxWidth: 960,
     margin: "0 auto",
-    padding: "16px 16px 40px",
+    padding: "16px 16px 44px",
   } as CSSProperties,
 
   navBar: {
     display: "flex",
-    gap: 12,
+    gap: 10,
     flexWrap: "wrap",
     marginBottom: 18,
   } as CSSProperties,
 
   navBtn: {
-    padding: "10px 16px",
+    padding: "8px 14px",
     borderRadius: 14,
     border: "1.5px solid #ddd",
     background: "#fff",
-    fontWeight: 800,
+    fontWeight: 700,
     cursor: "pointer",
   } as CSSProperties,
 
   navBtnActive: {
-    background: "#111",
-    color: "#fff",
-    borderColor: "#111",
+    borderColor: "#2f5cff",
+    color: "#2f5cff",
   } as CSSProperties,
 
   card: {
@@ -40,6 +39,7 @@ export const ui = {
     border: "1.5px solid #e5e5e5",
     borderRadius: 18,
     padding: 16,
+    boxShadow: "0 1px 0 rgba(0,0,0,0.02)",
   } as CSSProperties,
 
   cardTitle: {
@@ -49,16 +49,21 @@ export const ui = {
   } as CSSProperties,
 
   cardDesc: {
-    margin: "8px 0 0",
+    margin: "10px 0 0",
     lineHeight: 1.6,
     color: "#333",
-    fontWeight: 600,
   } as CSSProperties,
 
   grid2: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 14,
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 12,
+  } as CSSProperties,
+
+  pillRow: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
   } as CSSProperties,
 
   pill: {
@@ -66,23 +71,85 @@ export const ui = {
     borderRadius: 14,
     border: "1.5px solid #ddd",
     background: "#fff",
-    fontWeight: 900,
+    fontWeight: 800,
     whiteSpace: "nowrap",
   } as CSSProperties,
 
-  smallLink: {
-    fontSize: 14,
-    color: "#555",
-    textDecoration: "underline",
-    cursor: "pointer",
-    fontWeight: 700,
+  btnRow: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    marginTop: 14,
   } as CSSProperties,
 
-  backLink: {
-    fontSize: 16,
-    color: "#1b4fff",
-    textDecoration: "underline",
-    cursor: "pointer",
+  btn: {
+    padding: "10px 14px",
+    borderRadius: 14,
+    border: "1.5px solid #ddd",
+    background: "#fff",
     fontWeight: 800,
+    cursor: "pointer",
+  } as CSSProperties,
+
+  btnPrimary: {
+    borderColor: "#18a34a",
+  } as CSSProperties,
+
+  btnDisabled: {
+    opacity: 0.5,
+    cursor: "not-allowed",
+  } as CSSProperties,
+
+  choiceGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 12,
+    marginTop: 14,
+  } as CSSProperties,
+
+  choiceCard: {
+    borderRadius: 16,
+    border: "1.5px solid #ddd",
+    background: "#fff",
+    padding: 14,
+    fontWeight: 900,
+    fontSize: 20,
+    cursor: "pointer",
+    userSelect: "none",
+  } as CSSProperties,
+
+  choiceSelected: {
+    borderColor: "#2f5cff",
+    background: "#eef3ff",
+  } as CSSProperties,
+
+  choiceCorrect: {
+    borderColor: "#18a34a",
+    background: "#ecfdf3",
+  } as CSSProperties,
+
+  choiceWrong: {
+    borderColor: "#ef4444",
+    background: "#fff1f2",
+  } as CSSProperties,
+
+  notice: {
+    marginTop: 14,
+    borderRadius: 16,
+    border: "1.5px solid #ddd",
+    background: "#fff",
+    padding: 14,
+  } as CSSProperties,
+
+  noticeTitle: {
+    margin: 0,
+    fontWeight: 900,
+    fontSize: 18,
+  } as CSSProperties,
+
+  noticeText: {
+    margin: "8px 0 0",
+    lineHeight: 1.6,
+    color: "#333",
   } as CSSProperties,
 };
