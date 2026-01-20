@@ -17,7 +17,6 @@ export type PracticeSession = {
   hintLimit: number; // 固定 5
   hintUsed: number;
 
-  // 你之后接题库会用到
   stage?: string;
 
   createdAt: number;
@@ -49,7 +48,6 @@ function writeAll(map: SessionMap) {
   window.localStorage.setItem(LS_KEY, JSON.stringify(map));
 }
 
-/** 建立新回合（仍然是 “这个科目的一笔续做记录”） */
 export function newSession(subject: Subject, stage?: string): PracticeSession {
   const now = Date.now();
   return {
@@ -75,33 +73,31 @@ export function newSession(subject: Subject, stage?: string): PracticeSession {
   };
 }
 
-/** 读取某科目续做 */
 export function loadSession(subject: Subject): PracticeSession | null {
   const map = readAll();
   return map[subject] ?? null;
 }
 
-/** 保存某科目续做（覆盖同 subject） */
 export function saveSession(session: PracticeSession) {
   const map = readAll();
   map[session.subject] = { ...session, updatedAt: Date.now() };
   writeAll(map);
 }
 
-/** 删除某科目续做 */
+/** ✅ 兼容你现有 session-client.tsx 的 import：upsertSession */
+export const upsertSession = saveSession;
+
 export function removeSession(subject: Subject) {
   const map = readAll();
   delete map[subject];
   writeAll(map);
 }
 
-/** 读取全部“做到一半”的科目 */
 export function loadAllSessions(): PracticeSession[] {
   const map = readAll();
   return Object.values(map).sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-/** 清空全部（你以后可做“重置所有续做”按钮） */
 export function clearAllSessions() {
   writeAll({});
 }
