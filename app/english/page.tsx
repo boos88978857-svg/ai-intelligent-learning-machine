@@ -2,11 +2,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ui } from "../ui";
 import { loadSession } from "../lib/session";
 
-export default function EnglishPage() {
+export default function EnglishEntryPage() {
+  const router = useRouter();
   const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
@@ -16,30 +17,33 @@ export default function EnglishPage() {
 
   return (
     <main style={ui.wrap}>
-      <h1 style={{ margin: "0 0 12px", fontSize: 34, fontWeight: 900 }}>英文專區</h1>
+      <h1 style={{ margin: "0 0 12px", fontSize: 34, fontWeight: 1000 }}>
+        英文專區
+      </h1>
 
       <div style={ui.card}>
-        <h2 style={ui.cardTitle}>入口（示範）</h2>
+        <h2 style={ui.cardTitle}>入口</h2>
         <p style={ui.cardDesc}>
-          這裡之後會放「選擇階段 / 題庫模式」再開始回合。
-          <br />
-          目前先保留「續做」入口。
+          现在英文会走「阶段选择 → 出题」。学习区只负责续做。
         </p>
 
-        <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-          {hasSession ? (
-            <Link href="/practice/session" style={{ ...ui.navBtn, textDecoration: "none" }}>
-              續做未完成
-            </Link>
-          ) : (
-            <span style={{ opacity: 0.6 }}>目前沒有未完成可續做</span>
-          )}
-        </div>
+        {hasSession && (
+          <div style={{ marginTop: 10 }}>
+            <span
+              style={ui.smallLink}
+              onClick={() => router.push("/practice")}
+            >
+              有做到一半 → 去學習區續做
+            </span>
+          </div>
+        )}
       </div>
 
-      <button onClick={() => history.back()} style={ui.backLink}>
-        ← 回上一頁
-      </button>
+      <div style={{ marginTop: 18 }}>
+        <span style={ui.backLink} onClick={() => router.back()}>
+          ← 回上一頁
+        </span>
+      </div>
     </main>
   );
 }
