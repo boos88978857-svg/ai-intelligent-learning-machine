@@ -4,83 +4,83 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ui } from "../ui";
-import { loadAllSessions, removeSession, PracticeSession } from "../lib/session";
+import { PracticeSession, listInProgressSessions, removeSession, clearAllSessions } from "../lib/session";
 
 export default function PracticeHubPage() {
   const router = useRouter();
   const [sessions, setSessions] = useState<PracticeSession[]>([]);
 
   function refresh() {
-    setSessions(loadAllSessions());
+    setSessions(listInProgressSessions());
   }
 
   useEffect(() => {
     refresh();
   }, []);
 
-  function goContinue(subject: PracticeSession["subject"]) {
-    router.push(`/practice/session?subject=${encodeURIComponent(subject)}`);
-  }
-
-  function clearOne(subject: PracticeSession["subject"]) {
-    removeSession(subject);
-    refresh();
-  }
-
   return (
-    <main style={ui.wrap}>
-      <h1 style={{ margin: "0 0 12px", fontSize: 34, fontWeight: 1000 }}>
-        學習區（續做中心）
+    <main>
+      <h1 style={{ margin: "0 0 12px", fontSize: 40, fontWeight: 900 }}>
+        學習區
       </h1>
 
       <div style={ui.card}>
+        <h2 style={ui.cardTitle}>做到一半（可續做）</h2>
         <p style={ui.cardDesc}>
-          这里会显示你「做到一半」的科目。你可以继续作答，或清除进度。
+          這裡只負責續做/清除。要開始新回合請回到各科入口頁。
         </p>
-      </div>
 
-      <div style={{ marginTop: 14, display: "grid", gap: 14 }}>
-        {sessions.length === 0 ? (
-          <div style={ui.card}>
-            <p style={ui.cardDesc}>目前沒有任何續做。</p>
-          </div>
-        ) : (
-          sessions.map((s) => (
-            <div key={s.id} style={ui.card}>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <div style={ui.pill}>科目：{s.subject}</div>
-                <div style={ui.pill}>
-                  第 {s.currentIndex + 1} 題 / {s.totalQuestions}
-                </div>
-                <div style={ui.pill}>
-                  提示：{s.hintLimit}/{s.hintUsed}
-                </div>
-              </div>
-
-              <div style={{ marginTop: 14, display: "flex", gap: 12 }}>
-                <button
-                  style={ui.navBtn}
-                  onClick={() => goContinue(s.subject)}
-                >
-                  继续作答 →
-                </button>
-
-                <button
-                  style={ui.navBtn}
-                  onClick={() => clearOne(s.subject)}
-                >
-                  清除进度
-                </button>
-              </div>
+        <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+          {sessions.length === 0 ? (
+            <div style={{ color: "#666", fontWeight: 700 }}>
+              目前沒有做到一半的回合。
             </div>
-          ))
-        )}
-      </div>
+          ) : (
+            sessions.map((s) => (
+              <div key={s.id} style={{ ...ui.card, padding: 12 }}>
+                <div style={ui.pillRow}>
+                  <div style={ui.pill}>科目：{s.subject}</div>
+                  <div style={ui.pill}>
+                    進度：第 {s.currentIndex + 1} 題 / {s.totalQuestions}
+                  </div>
+                  <div style={ui.pill}>
+                    提示：{s.hintUsed}/{s.hintLimit}
+                  </div>
+                </div>
 
-      <div style={{ marginTop: 18 }}>
-        <span style={ui.backLink} onClick={() => router.back()}>
-          ← 回上一頁
-        </span>
+                <div style={ui.btnRow}>
+                  <button
+                    style={ui.btn}
+                    onClick={() => router.push(`/practice/session/${s.id}`)}
+                  >
+                    繼續
+                  </button>
+                  <button
+                    style={ui.btn}
+                    onClick={() => {
+                      removeSession(s.id);
+                      refresh();
+                    }}
+                  >
+                    清除
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={ui.btnRow}>
+          <button
+            style={ui.btn}
+            onClick={() => {
+              clearAllSessions();
+              refresh();
+            }}
+          >
+            清除全部續做
+          </button>
+        </div>
       </div>
     </main>
   );
